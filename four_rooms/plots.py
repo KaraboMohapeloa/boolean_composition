@@ -36,7 +36,7 @@ def plot1():
     plt.legend()
     plt.xlabel("Number of tasks")
     plt.ylabel('Number of solvable tasks')
-    plt.show()
+    # plt.show()
     fig.savefig("plots/analytic.pdf", bbox_inches='tight')
 #####################################################################################
 
@@ -63,7 +63,7 @@ def plot2():
     plt.ylabel('Cumulative timesteps to converge')
     ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
     plt.xlim(0, 17)
-    plt.show()
+    # plt.show()
     fig.savefig("plots/cum_bar.pdf", bbox_inches='tight')
 # #####################################################################################
 
@@ -98,7 +98,7 @@ def plot3():
     ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
     #ax.ticklabel_format(axis='y',style='scientific', useOffset=True)
     fig.tight_layout()
-    plt.show()
+    # plt.show()
     fig.savefig("plots/40goals_cum_bar.pdf", bbox_inches='tight')
 
 #####################################################################################
@@ -152,7 +152,7 @@ def plot4():
     
     fig, ax = plt.subplots()
     ax = sns.boxplot(x="Tasks", y="Average Returns", hue="Domain", data=data, linewidth=3, showfliers = False)
-    plt.show()
+    # plt.show()
     fig.savefig("plots/dense.pdf", bbox_inches='tight')
 
 
@@ -201,7 +201,7 @@ def plot5():
         
         fig, ax = plt.subplots()
         ax = sns.boxplot(x="Tasks", y="Average Returns", hue="", data=data, linewidth=3, showfliers = False)
-        plt.show()
+        # plt.show()
         fig.savefig("plots/dense_sp_"+str(i)+".pdf", bbox_inches='tight')
 
 
