@@ -81,6 +81,16 @@ def softmax_policy_improvement(env, Q, tau=1):
 
     return policy_improved
 
+def softmax_generalised_policy_improvement(env, Q, tau=1):
+
+    def policy_improved(state, goal=None):
+        q_values = Q[state][goal] if goal else np.max([Q[state][g] for g in Q[state].keys()], axis=0)
+        exp_q = np.exp(q_values / tau)
+        probs = exp_q / np.sum(exp_q)
+        return probs
+
+    return policy_improved
+
 #########################################################################################
 def Q_learning(env, Q_optimal=None, gamma=1, epsilon=1, alpha=1, maxiter=100, maxstep=100):
     """
@@ -144,7 +154,7 @@ def Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None, gamma=1, epsilo
     """
     N = min(env.rmin, (env.rmin-env.rmax)*env.diameter)
     Q = defaultdict(lambda: defaultdict(lambda: np.zeros(env.action_space.n)))
-    behaviour_policy =  epsilon_greedy_generalised_policy_improvement(env, Q, epsilon = epsilon)
+    behaviour_policy =  softmax_generalised_policy_improvement(env, Q, tau = 1)
     
     sMem={} # Goals memory
     if T_states:
@@ -161,7 +171,7 @@ def Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None, gamma=1, epsilo
     state = env.reset()
     stats["R"].append(0)
     while stop_cond(k):
-        probs = behaviour_policy(state, epsilon = epsilon)
+        probs = behaviour_policy(state)
         action = np.random.choice(np.arange(len(probs)), p=probs)            
         state_, reward, done, _ = env.step(action)
         
