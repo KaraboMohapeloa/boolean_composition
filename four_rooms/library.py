@@ -81,14 +81,21 @@ def softmax_policy_improvement(env, Q, tau=1):
 
     return policy_improved
 
-def softmax_generalised_policy_improvement(env, Q, tau=1):
+def softmax_generalised_policy_improvement(env, Q, tau=100):
 
     def policy_improved(state, goal=None):
-        q_values = Q[state][goal] if goal else np.max([Q[state][g] for g in Q[state].keys()], axis=0)
+        if goal:
+            q_values = Q[state][goal]
+        else:
+            values = [Q[state][goal] for goal in Q[state].keys()]
+            if len(values)==0:
+                q_values = np.zeros(env.action_space.n)
+            else:
+                q_values = np.max(values,axis=0)
         exp_q = np.exp(q_values / tau)
         probs = exp_q / np.sum(exp_q)
         return probs
-
+    
     return policy_improved
 
 #########################################################################################
@@ -139,7 +146,7 @@ def Q_learning(env, Q_optimal=None, gamma=1, tau=10, alpha=1, maxiter=100, maxst
     
     return Q, stats
 
-def Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None, gamma=1, epsilon=1, alpha=1, maxiter=100, maxstep=100):
+def Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None, gamma=1, tau=10, alpha=1, maxiter=100, maxstep=100):
     """
     Implements Goal Oriented Q_learning
 
@@ -154,8 +161,8 @@ def Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None, gamma=1, epsilo
     """
     N = min(env.rmin, (env.rmin-env.rmax)*env.diameter)
     Q = defaultdict(lambda: defaultdict(lambda: np.zeros(env.action_space.n)))
-    behaviour_policy =  epsilon_greedy_generalised_policy_improvement(env, Q, epsilon = epsilon)
-    
+    behaviour_policy =  softmax_generalised_policy_improvement(env, Q, tau=tau)
+
     sMem={} # Goals memory
     if T_states:
         for state in T_states:
