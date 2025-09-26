@@ -1,6 +1,7 @@
 import torch
 from torch.autograd import Variable
 
+
 from gym_repoman.envs.collect_env import CollectEnv
 import numpy as np
 import copy
@@ -11,7 +12,7 @@ import os
 
 from dqn import DQN, ComposedDQN, FloatTensor
 from wrappers import WarpFrame
-
+print(torch.__version__)
 def load(path, env):
     dqn = DQN(env.action_space.n)
     dqn.load_state_dict(torch.load(path))

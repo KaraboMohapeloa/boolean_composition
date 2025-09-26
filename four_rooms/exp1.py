@@ -28,9 +28,9 @@ for i in range(num_runs):
         print("Task: ",j)
         goals = [[pos,pos] for pos in Tasks[j]]
         env = GridWorld(goals=goals, goal_reward=1, step_reward=-0.01, T_states=T_states)
-        _,stats = Q_learning(env, Q_optimal=Qs[j])
+        _,stats = Q_learning(env, tau=100, Q_optimal=Qs[j])
         dataQ[i,j] = stats["T"]
-        _,stats = Goal_Oriented_Q_learning(env, Q_optimal=EQs[j])
+        _,stats = Goal_Oriented_Q_learning(env, tau=100, Q_optimal=EQs[j])
         dataEQ[i,j] = stats["T"]
 
 data1 = dd.io.save('exps_data/exp1_samples_Qs.h5', dataQ )

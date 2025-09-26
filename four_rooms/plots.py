@@ -8,6 +8,8 @@ import pandas as pd
 import seaborn as sns
 import deepdish as dd
 
+from mpl_toolkits.mplot3d import Axes3D  # noqa: F401 unused import
+
 
 
 #####################################################################################
@@ -205,4 +207,78 @@ def plot5():
         fig.savefig("plots/dense_sp_"+str(i)+".pdf", bbox_inches='tight')
 
 
-plot1();plot2();plot3();plot4();plot5()
+
+def hyper_plot_general(param_values, param_name, file_suffix, plot_filename):
+    """
+    Generalized 3D bar plot for hyperparameter sweeps.
+    param_values: list of parameter values (e.g., tau or epsilon)
+    param_name: string, name for axis label (e.g., 'Tau', 'Epsilon')
+    file_suffix: string, suffix for file loading (e.g., 'tau', 'epsilon')
+    plot_filename: string, output filename for plot
+    """
+    Z1 = []
+    Z2 = []
+    for val in param_values:
+        data_q = dd.io.load(f'exps_data/exp1_samples_Qs.h5_{file_suffix}={val}')
+        data_eq = dd.io.load(f'exps_data/exp1_samples_EQs.h5_{file_suffix}={val}')
+        mean_cum_q = np.cumsum(np.mean(data_q, axis=0)) / 1e5
+        mean_cum_eq = np.cumsum(np.mean(data_eq, axis=0)) / 1e5
+        Z1.append(mean_cum_q)
+        Z2.append(mean_cum_eq)
+    Z1 = np.array(Z1)
+    Z2 = np.array(Z2)
+    num_tasks = Z1.shape[1]
+    y = np.arange(0, num_tasks)
+    x = np.array(param_values)
+
+    fig = plt.figure(figsize=(22, 8))
+    ax1 = fig.add_subplot(121, projection='3d')
+    ax2 = fig.add_subplot(122, projection='3d')
+    # Make bar thickness proportional to number of tasks
+    # Bars are thin along the epsilon axis (dx), wide along number of tasks axis (dy)
+    dx = (x[1] - x[0]) * 0.2 if len(x) > 1 else 0.2  # thin along param axis
+    dy = 0.8  # wide along tasks axis
+    cmap = plt.get_cmap('tab10')
+    param_colors = [cmap(i % 10) for i in range(len(x))]
+    for i, val in enumerate(x):
+        for j, task in enumerate(y):
+            xpos = val - dx/2
+            ypos = task - dy/2
+            zpos = 0
+            height_q = Z1[i, j]
+            height_eq = Z2[i, j]
+            ax1.bar3d(xpos, ypos, zpos, dx, dy, height_q, color=param_colors[i], alpha=0.7)
+            ax2.bar3d(xpos, ypos, zpos, dx, dy, height_eq, color=param_colors[i], alpha=0.7)
+            if j == num_tasks - 1:
+                ax1.text(val, task, height_q, f'{height_q:.2f}', color='black', fontsize=12, ha='center', va='bottom')
+                ax2.text(val, task, height_eq, f'{height_eq:.2f}', color='black', fontsize=12, ha='center', va='bottom')
+    ax1.set_xlabel(param_name)
+    ax1.set_ylabel('Number of tasks')
+    ax1.set_zlabel('Cumulative Q ($\\times 10^5$)')
+    ax1.set_title('$Q$-function')
+    ax1.set_xticks(x)
+    ax2.set_xlabel(param_name)
+    ax2.set_ylabel('Number of tasks')
+    ax2.set_zlabel('Cumulative EQ ($\\times 10^5$)')
+    ax2.set_title('Extended $Q$-function')
+    ax2.set_xticks(x)
+    from matplotlib.patches import Patch
+    legend_elements = [Patch(facecolor=param_colors[i], label=f'{param_name}={val}') for i, val in enumerate(x)]
+    ax1.legend(handles=legend_elements, loc='upper left')
+    ax2.legend(handles=legend_elements, loc='upper left')
+    plt.tight_layout()
+    plt.show()
+    fig.savefig(plot_filename, bbox_inches='tight')
+
+# Usage examples:
+def hyper_plot_softmax():
+    tau_values = [1, 5, 10, 50, 100]
+    hyper_plot_general(tau_values, 'Tau', 'tau', 'plots/hyper_softmax.pdf')
+
+def hyper_plot_epsilon():
+    epsilon_values = [0.1, 0.3, 0.5, 0.7, 1.0]
+    hyper_plot_general(epsilon_values, 'Epsilon', 'epsilon', 'plots/hyper_epsilon.pdf')
+
+hyper_plot_epsilon()
+hyper_plot_softmax()
+

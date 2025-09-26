@@ -199,6 +199,7 @@ class MaxDQN(nn.Module):
 class Agent(object):
     def __init__(self,
                  env,
+                 training_stats = {"R": [], "T": 0},
                  max_timesteps=2000000,
                  learning_starts=10000,
                  train_freq=4,
@@ -224,6 +225,7 @@ class Agent(object):
         self.gamma = gamma
         self.print_freq = print_freq
         self.path = path
+        self.training_stats = {"R": [], "T": 0}
 
         self.eps_schedule = LinearSchedule(eps_timesteps, eps_final, eps_initial)
 
@@ -260,7 +262,10 @@ class Agent(object):
 
     def train(self):
         obs = self.env.reset()
-        episode_rewards = [0.0]
+        # Initialize training_stats for new training session
+        self.training_stats["R"] = []
+        self.training_stats["T"] = 0
+        self.training_stats["R"].append(0)
 
         for t in range(self.max_timesteps):
             action = self.select_action(obs)
@@ -268,11 +273,14 @@ class Agent(object):
             self.replay_buffer.add(obs, action.cpu(), reward, new_obs, done)
             obs = new_obs
 
-            episode_rewards[-1] += reward
+            # Add reward to current episode
+            self.training_stats["R"][-1] += reward
+
             if done:
                 obs = self.env.reset()
-                episode_rewards.append(0.0)
+                self.training_stats["R"].append(0)
 
+            # ...existing code...
             if t > self.learning_starts and t % self.train_freq == 0:
                 obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = self.replay_buffer.sample(self.batch_size)
                 obs_batch = Variable(torch.from_numpy(obs_batch).type(FloatTensor))
@@ -302,16 +310,20 @@ class Agent(object):
             if t > self.learning_starts and t % self.target_update_freq == 0:
                 self.target_q_func.load_state_dict(self.q_func.state_dict())
                 torch.save(self.q_func.state_dict(), self.path+'model.dqn')
-                print("\nModel saved\n")      
+                dd.io.save('exps_data/vanilla/prime_experiment_stats.h5', self.training_stats)
+                print("\nModel and training stats saved\n")      
 
             self.steps += 1
 
-            mean_100ep_reward = round(np.mean(episode_rewards[-101:-1]), 1)
-            num_episodes = len(episode_rewards)
-            if done and self.print_freq is not None and len(episode_rewards) % self.print_freq == 0:
+            mean_100ep_reward = round(np.mean(self.training_stats["R"][-101:-1]), 1)
+            num_episodes = len(self.training_stats["R"])
+            if done and self.print_freq is not None and num_episodes % self.print_freq == 0:
                 print("--------------------------------------------------------")
                 print("steps {}".format(t))
                 print("episodes {}".format(num_episodes))
                 print("mean 100 episode reward {}".format(mean_100ep_reward))
                 print("% time spent exploring {}".format(int(100 * self.eps_schedule(t))))
                 print("--------------------------------------------------------")
+
+        # After training, set total steps
+        self.training_stats["T"] = self.steps
