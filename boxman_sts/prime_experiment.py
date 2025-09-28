@@ -1,5 +1,4 @@
 import numpy as np
-
 import torch
 
 from dqn import Agent as AgentVanilla, DQN as DQNVanilla, FloatTensor as FloatTensorVanilla
