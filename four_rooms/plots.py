@@ -206,7 +206,7 @@ def plot5():
         # plt.show()
         fig.savefig("plots/dense_sp_"+str(i)+".pdf", bbox_inches='tight')
 
-
+#####################################################################################
 
 def hyper_plot_general(param_values, param_name, file_suffix, plot_filename):
     """
@@ -279,6 +279,40 @@ def hyper_plot_epsilon():
     epsilon_values = [0.1, 0.3, 0.5, 0.7, 1.0]
     hyper_plot_general(epsilon_values, 'Epsilon', 'epsilon', 'plots/hyper_epsilon.pdf')
 
-hyper_plot_epsilon()
-hyper_plot_softmax()
+
+#####################################################################################
+
+def plot_bdqn_bar():
+    data1 = dd.io.load('exps_data/bdqn/exp1_epsilon_samples_Qs.h5')
+    data2 = dd.io.load('exps_data/bdqn/exp1_bdqn_samples_EQs.h5')
+
+    mean1 = np.cumsum(data1.mean(axis=0))
+    std1 = data1.std(axis=0)
+    mean2 = np.cumsum(data2.mean(axis=0))
+    std2 = data2.std(axis=0)
+
+    s = 20
+    rc_ = {'figure.figsize':(11,8),'axes.labelsize': 30, 'xtick.labelsize': s, 
+        'ytick.labelsize': s, 'legend.fontsize': 25}
+    sns.set(rc=rc_, style="darkgrid")
+    rc('text', usetex=True)
+
+    fig,ax=plt.subplots()
+    # Plot the bar with the smaller mean value last (so it is visually on top)
+    if mean1[-1] < mean2[-1]:
+        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label=r"Extended $Q$-function")
+        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label=r"$Q$-function")
+    else:
+        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label=r"$Q$-function")
+        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label=r"Extended $Q$-function")
+    plt.legend()
+    plt.xlabel("Number of tasks")
+    plt.ylabel('Cumulative timesteps to converge')
+    ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
+    plt.xlim(0, 17)
+    # plt.show()
+    fig.savefig("plots/bdqn_average_cum_bar.pdf", bbox_inches='tight')
+#####################################################################################
+
+plot_bdqn_bar()
 

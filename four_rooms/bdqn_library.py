@@ -1,0 +1,417 @@
+import numpy as np
+
+from collections import defaultdict
+from copy import deepcopy
+from ast import literal_eval
+
+
+#########################################################################################
+def bootstrapped_generalised_policy_improvement(env, Q_list, method="average"):
+    """
+    Generalized policy improvement for bootstrapped DQN with multi-goal Q-tables.
+
+    Arguments:
+    env -- environment with which agent interacts
+    Q_list -- list of Q-functions (each Q is a dict mapping state to dicts of goal: action-values)
+    method -- 'average' (default) or 'majority' for action selection
+
+    Returns:
+    policy_improved -- Improved policy function (state, goal) -> action probabilities
+    """
+    def policy_improved(state, goal=None):
+        n_actions = env.action_space.n
+        q_values = []
+        for Q in Q_list:
+            if state in Q:
+                if goal is not None and goal in Q[state]:
+                    q_values.append(Q[state][goal])
+                elif goal is None and Q[state]:
+                    # If no goal specified, use max over all goals for this state
+                    q_values.append(np.max([Q[state][g] for g in Q[state].keys()], axis=0))
+        if not q_values:
+            return np.ones(n_actions) / n_actions
+        q_values = np.array(q_values)
+        if method == "average":
+            avg_q = np.mean(q_values, axis=0)
+            best_action = np.random.choice(np.flatnonzero(avg_q == avg_q.max()))
+        elif method == "majority":
+            best_actions = [np.argmax(q) for q in q_values]
+            counts = np.bincount(best_actions, minlength=n_actions)
+            best_action = np.random.choice(np.flatnonzero(counts == counts.max()))
+        else:
+            raise ValueError(f"Unknown method: {method}")
+        probs = np.zeros(n_actions)
+        probs[best_action] = 1.0
+        return probs
+
+    return policy_improved
+
+def bootstrapped_dqn_policy_improvement(env, Q_list, method="average"):
+    """
+    Policy improvement using an ensemble of Q-functions (bootstrapped DQN).
+
+    Arguments:
+    env -- environment with which agent interacts
+    Q_list -- list of Q-functions (each Q is a dict mapping state to action-values)
+    method -- 'average' (default) or 'majority' for action selection
+
+    Returns:
+    policy_improved -- Improved policy function
+    """
+    def policy_improved(state):
+        n_actions = env.action_space.n
+        q_values = np.array([Q[state] for Q in Q_list if state in Q])
+        if len(q_values) == 0:
+            # If state not in any Q, return uniform random
+            return np.ones(n_actions) / n_actions
+        if method == "average":
+            avg_q = np.mean(q_values, axis=0)
+            best_action = np.random.choice(np.flatnonzero(avg_q == avg_q.max()))
+        elif method == "majority":
+            best_actions = [np.argmax(q) for q in q_values]
+            counts = np.bincount(best_actions, minlength=n_actions)
+            best_action = np.random.choice(np.flatnonzero(counts == counts.max()))
+        else:
+            raise ValueError("Unknown method: {}".format(method))
+        probs = np.zeros(n_actions)
+        probs[best_action] = 1.0
+        return probs
+
+    return policy_improved
+
+
+def Q_equal(Q1,Q2,epsilon=1e-5):    
+    for state in Q1:
+        for action in range(len(Q1[state])): 
+            v1 = Q1[state][action]
+            v2 = Q2[state][action]
+            if abs(v1-v2)>epsilon:
+                return False
+    return True
+
+def EQ_equal(EQ1,EQ2,epsilon=1e-5):    
+    for state in EQ1:
+        for goal in EQ1[state]:
+            for action in range(len(EQ1[state][goal])): 
+                v1 = EQ1[state][goal][action]
+                v2 = EQ2[state][goal][action]
+                if not (abs(v1-v2)<epsilon or (v1<-30 and v2<-30)):
+                    return False
+    return True
+#########################################################################################
+def epsilon_greedy_policy_improvement(env, Q, epsilon=1):
+    """
+    Implements policy improvement by acting epsilon-greedily on Q
+
+    Arguments:
+    env -- environment with which agent interacts
+    Q -- Action function for current policy
+    epsilon -- probability
+
+    Returns:
+    policy_improved -- Improved policy
+    """
+        
+    def policy_improved(state, epsilon = epsilon):
+        probs = np.ones(env.action_space.n, dtype=float)*(epsilon/env.action_space.n)
+        best_action = np.random.choice(np.flatnonzero(Q[state] == Q[state].max())) #np.argmax(Q[state]) #
+        probs[best_action] += 1.0 - epsilon
+        return probs
+
+    return policy_improved
+
+def epsilon_greedy_generalised_policy_improvement(env, Q, epsilon = 1):
+    """
+    Implements generalised policy improvement by acting epsilon-greedily on Q
+
+    Arguments:
+    env -- environment with which agent interacts
+    Q -- Action function for current policy
+
+    Returns:
+    policy_improved -- Improved policy
+    """
+    
+    def policy_improved(state, goal = None, epsilon = epsilon):
+        probs = np.ones(env.action_space.n, dtype=float)*(epsilon/env.action_space.n)
+        values = [Q[state][goal]] if goal else [Q[state][goal] for goal in Q[state].keys()]
+        if len(values)==0:
+            best_action = np.random.randint(env.action_space.n)
+        else:
+            values = np.max(values,axis=0)
+            best_action = np.random.choice(np.flatnonzero(values == values.max()))
+        probs[best_action] += 1.0 - epsilon
+        return probs
+
+    return policy_improved
+
+def softmax_policy_improvement(env, Q, tau=1):
+
+    def policy_improved(state):
+        q_values = Q[state]
+        exp_q = np.exp(q_values / tau)
+        probs = exp_q / np.sum(exp_q)
+        return probs
+
+    return policy_improved
+
+def softmax_generalised_policy_improvement(env, Q, tau=100):
+
+    def policy_improved(state, goal=None):
+        if goal:
+            q_values = Q[state][goal]
+        else:
+            values = [Q[state][goal] for goal in Q[state].keys()]
+            if len(values)==0:
+                q_values = np.zeros(env.action_space.n)
+            else:
+                q_values = np.max(values,axis=0)
+        exp_q = np.exp(q_values / tau)
+        probs = exp_q / np.sum(exp_q)
+        return probs
+    
+    return policy_improved
+
+#########################################################################################
+def Q_learning(env, Q_optimal=None, gamma=1, alpha=1, maxiter=100, maxstep=100):
+    """
+    Implements Q_learning
+
+    Arguments:
+    env -- environment with which agent interacts
+    gamma -- discount factor
+    alpha -- learning rate
+    maxiter -- maximum number of episodes
+
+    Returns:
+    Q -- New estimate of Q function
+    """
+    n_heads = 10
+    Q_list = [defaultdict(lambda: np.zeros(env.action_space.n)) for _ in range(n_heads)]
+    behaviour_policy = bootstrapped_dqn_policy_improvement(env, Q_list, method="average")
+
+    stop_cond = lambda k: k < maxiter
+    # Q_optimal check is not supported for Q_list directly
+
+    stats = {"R":[], "T":0}
+    k=0
+    T=0
+    state = env.reset()
+    stats["R"].append(0)
+    while stop_cond(k):
+        probs = behaviour_policy(state)
+        action = np.random.choice(np.arange(len(probs)), p=probs)
+        state_, reward, done, _ = env.step(action)
+        stats["R"][k] += reward
+        for Q in Q_list:
+            G = 0 if done else np.max(Q[state_])
+            TD_target = reward + gamma*G
+            TD_error = TD_target - Q[state][action]
+            Q[state][action] = Q[state][action] + alpha*TD_error
+        state = state_
+        T+=1
+        if done:
+            state = env.reset()
+            stats["R"].append(0)
+            k+=1
+    stats["T"] = T
+    return Q_list, stats
+
+def Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None, gamma=1, alpha=1, maxiter=100, maxstep=100):
+
+    """
+    Implements Bootstrapped DQN (BDQN) Goal Oriented Q-learning
+
+    Arguments:
+    env -- environment with which agent interacts
+    gamma -- discount factor
+    alpha -- learning rate
+    maxiter -- maximum number of episodes
+    n_heads -- number of Q-heads (bootstrapped heads)
+
+    Returns:
+    Q_list -- List of Q-heads (Q-tables)
+    stats -- Training statistics
+    """
+    n_heads = 10
+    N = min(env.rmin, (env.rmin-env.rmax)*env.diameter)
+    Q_list = [defaultdict(lambda: defaultdict(lambda: np.zeros(env.action_space.n))) for _ in range(n_heads)]
+    behaviour_policy = bootstrapped_generalised_policy_improvement(env, Q_list, method="average")
+
+    sMem = {}
+    if T_states:
+        for state in T_states:
+            sMem[str(state)] = 0
+
+    stop_cond = lambda k: k < maxiter
+    # Note: Q_optimal/EQ_equal check is not supported for Q_list directly
+
+    stats = {"R": [], "T": 0}
+    k = 0
+    T = 0
+    state = env.reset()
+    stats["R"].append(0)
+    while stop_cond(k):
+        probs = behaviour_policy(state, None)
+        action = np.random.choice(np.arange(len(probs)), p=probs)
+        state_, reward, done, _ = env.step(action)
+        stats["R"][k] += reward
+        if done:
+            sMem[state] = 0
+        for goal in sMem.keys():
+            if state != goal and done:
+                reward_ = N
+            else:
+                reward_ = reward
+            for Q in Q_list:
+                if state not in Q:
+                    Q[state] = defaultdict(lambda: np.zeros(env.action_space.n))
+                if goal not in Q[state]:
+                    Q[state][goal] = np.zeros(env.action_space.n)
+                if state_ in Q and goal in Q[state_]:
+                    G = 0 if done else np.max(Q[state_][goal])
+                else:
+                    G = 0
+                TD_target = reward_ + gamma * G
+                TD_error = TD_target - Q[state][goal][action]
+                Q[state][goal][action] = Q[state][goal][action] + alpha * TD_error
+        state = state_
+        T += 1
+        if done:
+            state = env.reset()
+            stats["R"].append(0)
+            k += 1
+    stats["T"] = T
+
+    return Q_list, stats
+
+#########################################################################################
+def EQ_NP(EQ):
+    P = defaultdict(lambda: defaultdict(lambda: 0))
+    for state in EQ:
+        for goal in EQ[state]:
+                P[state][goal] = np.argmax(EQ[state][goal])
+                #v = EQ[state][goal]
+                #P[state][goal] = np.random.choice(np.flatnonzero(v == v.max()))
+    return P
+def EQ_P(EQ, goal=None):
+    P = defaultdict(lambda: 0)
+    for state in EQ:
+        if goal:
+            P[state] = np.argmax(EQ[state][goal])
+            #v = EQ[state][goal]
+            #P[state] = np.random.choice(np.flatnonzero(v == v.max()))
+        else:
+            Vs = [EQ[state][goal] for goal in EQ[state].keys()]
+            P[state] = np.argmax(np.max(Vs,axis=0))
+            #v = np.max(Vs,axis=0)
+            #P[state] = np.random.choice(np.flatnonzero(v == v.max()))
+    return P
+def Q_P(Q):
+    P = defaultdict(lambda: 0)
+    for state in Q:
+        P[state] = np.argmax(Q[state])
+    return P
+
+def EQ_NV(EQ):
+    V = defaultdict(lambda: defaultdict(lambda: 0))
+    for state in EQ:
+        for goal in EQ[state]:
+                V[state][goal] = np.max(EQ[state][goal])
+    return V
+def EQ_V(EQ, goal=None):
+    V = defaultdict(lambda: 0)
+    for state in EQ:
+        if goal:
+            V[state] = np.max(EQ[state][goal])
+        else:
+            Vs = [EQ[state][goal] for goal in EQ[state].keys()]
+            V[state] = np.max(np.max(Vs,axis=0))
+    return V
+def NV_V(NV, goal=None):
+    V = defaultdict(lambda: 0)
+    for state in NV:
+        if goal:
+            V[state] = NV[state][goal]
+        else:
+            Vs = [NV[state][goal] for goal in NV[state].keys()]
+            V[state] = np.max(Vs)
+    return V
+def Q_V(Q):
+    V = defaultdict(lambda: 0)
+    for state in Q:
+        V[state] = np.max(Q[state])
+    return V
+
+def EQ_Q(EQ, goal=None):
+    Q = defaultdict(lambda: np.zeros(5))
+    for state in EQ:
+        if goal:
+            Q[state] = EQ[state][goal]
+        else:
+            Vs = [EQ[state][goal] for goal in EQ[state].keys()]
+            Q[state] = np.max(Vs,axis=0)
+    return Q
+
+#########################################################################################
+def MAX(Q1, Q2):
+    Q = defaultdict(lambda: 0)
+    for s in list(set(list(Q1.keys())) & set(list(Q2.keys()))):
+        Q[s] = np.max([Q1[s],Q2[s]], axis=0)
+    return Q
+
+def AVG(Q1, Q2):
+    Q = defaultdict(lambda: 0)
+    for s in list(set(list(Q1.keys())) & set(list(Q2.keys()))):
+        Q[s] = (Q1[s]+Q2[s])/2
+    return Q
+
+#########################################################################################
+def EQMAX(EQ,rmax=2): #Estimating EQ_max
+    rmax = rmax
+    EQ_max = defaultdict(lambda: defaultdict(lambda: np.zeros(5)))
+    for s in list(EQ.keys()):
+        for g in list(EQ[s].keys()):
+            c = rmax-max(EQ[g][g])
+            if s==g:
+                EQ_max[s][g] = EQ[s][g]*0 + rmax
+            else:      
+                EQ_max[s][g] = EQ[s][g] + c   
+    return EQ_max
+
+def EQMIN(EQ,rmin=-0.1): #Estimating EQ_min
+    rmin = rmin
+    EQ_min = defaultdict(lambda: defaultdict(lambda: np.zeros(5)))
+    for s in list(EQ.keys()):
+        for g in list(EQ[s].keys()):
+            c = rmin-max(EQ[g][g])
+            if s==g:
+                EQ_min[s][g] = EQ[s][g]*0 + rmin
+            else:      
+                EQ_min[s][g] = EQ[s][g] + c  
+    return EQ_min
+
+def NOT(EQ, EQ_max=None, EQ_min=None):
+    EQ_max = EQ_max if EQ_max else EQMAX(EQ)
+    EQ_min = EQ_min if EQ_min else EQMIN(EQ)
+    EQ_not = defaultdict(lambda: defaultdict(lambda: np.zeros(5)))
+    for s in list(EQ.keys()):
+        for g in list(EQ[s].keys()):
+            EQ_not[s][g] = (EQ_max[s][g]+EQ_min[s][g]) - EQ[s][g]    
+    return EQ_not
+
+def OR(EQ1, EQ2):
+    EQ = defaultdict(lambda: defaultdict(lambda: np.zeros(5)))
+    for s in list(EQ1.keys()):
+        for g in list(EQ1[s].keys()):
+            EQ[s][g] = np.max([EQ1[s][g],EQ2[s][g]],axis=0)
+    return EQ
+
+def AND(EQ1, EQ2):
+    EQ = defaultdict(lambda: defaultdict(lambda: np.zeros(5)))
+    for s in list(EQ1.keys()):
+        for g in list(EQ1[s].keys()):
+            EQ[s][g] = np.min([EQ1[s][g],EQ2[s][g]],axis=0)
+    return EQ
+
+#########################################################################################
