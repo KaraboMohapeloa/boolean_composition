@@ -1,3 +1,76 @@
+import math
+# Tabular Bayesian Q-learning with Gaussian posteriors
+class BayesianTabularQ:
+    def __init__(self, env, prior_mean=0.0, prior_var=1.0, noise_var=1.0):
+        self.env = env
+        self.n_actions = env.action_space.n
+        self.means = defaultdict(lambda: np.zeros(self.n_actions) + prior_mean)
+        self.vars = defaultdict(lambda: np.ones(self.n_actions) * prior_var)
+        self.noise_var = noise_var  # observation noise variance
+
+    def update(self, state, action, target):
+        # Bayesian update for Gaussian posterior
+        mu = self.means[state][action]
+        var = self.vars[state][action]
+        noise_var = self.noise_var
+        # Posterior update (conjugate for Gaussian)
+        post_var = 1.0 / (1.0/var + 1.0/noise_var)
+        post_mean = post_var * (mu/var + target/noise_var)
+        self.means[state][action] = post_mean
+        self.vars[state][action] = post_var
+
+    def sample_q(self, state):
+        # Sample Q-values for all actions from posterior
+        mu = self.means[state]
+        var = self.vars[state]
+        return np.random.normal(mu, np.sqrt(var))
+
+def bayesian_tabular_q_policy_improvement(env, bayesQ):
+    """
+    Policy improvement using Thompson sampling from Bayesian Q posteriors.
+    env -- environment
+    bayesQ -- BayesianTabularQ instance
+    Returns: policy_improved(state) -> action probabilities (1-hot)
+    """
+    def policy_improved(state):
+        q_sample = bayesQ.sample_q(state)
+        n_actions = env.action_space.n
+        best_action = np.random.choice(np.flatnonzero(q_sample == q_sample.max()))
+        probs = np.zeros(n_actions)
+        probs[best_action] = 1.0
+        return probs
+    return policy_improved
+def bayesian_tabular_q_learning(env, gamma=1.0, maxiter=100, prior_mean=0.0, prior_var=1.0, noise_var=1.0):
+    """
+    Tabular Bayesian Q-learning with Gaussian posteriors and Thompson sampling.
+    Returns: bayesQ (posterior means/vars), stats
+    """
+    bayesQ = BayesianTabularQ(env, prior_mean, prior_var, noise_var)
+    policy = bayesian_tabular_q_policy_improvement(env, bayesQ)
+    stats = {"R":[], "T":0}
+    k = 0
+    T = 0
+    state = env.reset()
+    stats["R"].append(0)
+    while k < maxiter:
+        probs = policy(state)
+        action = np.random.choice(np.arange(len(probs)), p=probs)
+        state_, reward, done, _ = env.step(action)
+        stats["R"][k] += reward
+        # Bayesian Q update: target = reward + gamma * max_a' Q(s',a') (use mean for target)
+        if done:
+            target = reward
+        else:
+            target = reward + gamma * np.max(bayesQ.means[state_])
+        bayesQ.update(state, action, target)
+        state = state_
+        T += 1
+        if done:
+            state = env.reset()
+            stats["R"].append(0)
+            k += 1
+    stats["T"] = T
+    return bayesQ, stats
 import numpy as np
 
 from collections import defaultdict
@@ -6,14 +79,14 @@ from ast import literal_eval
 
 
 #########################################################################################
-def bootstrapped_generalised_policy_improvement(env, Q_list, method="average"):
+def bayesian_generalised_dqn_policy_improvement(env, Q_list, method="average"):
     """
-    Generalized policy improvement for bootstrapped DQN with multi-goal Q-tables.
+    Generalized policy improvement for Bayesian/bootstrapped DQN with multi-goal Q-tables.
 
     Arguments:
     env -- environment with which agent interacts
     Q_list -- list of Q-functions (each Q is a dict mapping state to dicts of goal: action-values)
-    method -- 'average' (default) or 'majority' for action selection
+    method -- 'average', 'majority', or 'thompson' for action selection
 
     Returns:
     policy_improved -- Improved policy function (state, goal) -> action probabilities
@@ -38,6 +111,10 @@ def bootstrapped_generalised_policy_improvement(env, Q_list, method="average"):
             best_actions = [np.argmax(q) for q in q_values]
             counts = np.bincount(best_actions, minlength=n_actions)
             best_action = np.random.choice(np.flatnonzero(counts == counts.max()))
+        elif method == "thompson":
+            # Thompson sampling: sample one Q-head and act greedily
+            q = q_values[np.random.randint(len(q_values))]
+            best_action = np.random.choice(np.flatnonzero(q == q.max()))
         else:
             raise ValueError(f"Unknown method: {method}")
         probs = np.zeros(n_actions)
@@ -46,14 +123,14 @@ def bootstrapped_generalised_policy_improvement(env, Q_list, method="average"):
 
     return policy_improved
 
-def bootstrapped_dqn_policy_improvement(env, Q_list, method="average"):
+def bayesian_dqn_policy_improvement(env, Q_list, method="average"):
     """
-    Policy improvement using an ensemble of Q-functions (bootstrapped DQN).
+    Policy improvement using an ensemble of Q-functions (Bayesian/bootstrapped DQN).
 
     Arguments:
     env -- environment with which agent interacts
     Q_list -- list of Q-functions (each Q is a dict mapping state to action-values)
-    method -- 'average' (default) or 'majority' for action selection
+    method -- 'average', 'majority', or 'thompson' for action selection
 
     Returns:
     policy_improved -- Improved policy function
@@ -71,8 +148,12 @@ def bootstrapped_dqn_policy_improvement(env, Q_list, method="average"):
             best_actions = [np.argmax(q) for q in q_values]
             counts = np.bincount(best_actions, minlength=n_actions)
             best_action = np.random.choice(np.flatnonzero(counts == counts.max()))
+        elif method == "thompson":
+            # Thompson sampling: sample one Q-head and act greedily
+            q = q_values[np.random.randint(len(q_values))]
+            best_action = np.random.choice(np.flatnonzero(q == q.max()))
         else:
-            raise ValueError("Unknown method: {}".format(method))
+            raise ValueError(f"Unknown method: {method}")
         probs = np.zeros(n_actions)
         probs[best_action] = 1.0
         return probs
@@ -98,79 +179,7 @@ def EQ_equal(EQ1,EQ2,epsilon=1e-5):
                 if not (abs(v1-v2)<epsilon or (v1<-30 and v2<-30)):
                     return False
     return True
-#########################################################################################
-def epsilon_greedy_policy_improvement(env, Q, epsilon=1):
-    """
-    Implements policy improvement by acting epsilon-greedily on Q
 
-    Arguments:
-    env -- environment with which agent interacts
-    Q -- Action function for current policy
-    epsilon -- probability
-
-    Returns:
-    policy_improved -- Improved policy
-    """
-        
-    def policy_improved(state, epsilon = epsilon):
-        probs = np.ones(env.action_space.n, dtype=float)*(epsilon/env.action_space.n)
-        best_action = np.random.choice(np.flatnonzero(Q[state] == Q[state].max())) #np.argmax(Q[state]) #
-        probs[best_action] += 1.0 - epsilon
-        return probs
-
-    return policy_improved
-
-def epsilon_greedy_generalised_policy_improvement(env, Q, epsilon = 1):
-    """
-    Implements generalised policy improvement by acting epsilon-greedily on Q
-
-    Arguments:
-    env -- environment with which agent interacts
-    Q -- Action function for current policy
-
-    Returns:
-    policy_improved -- Improved policy
-    """
-    
-    def policy_improved(state, goal = None, epsilon = epsilon):
-        probs = np.ones(env.action_space.n, dtype=float)*(epsilon/env.action_space.n)
-        values = [Q[state][goal]] if goal else [Q[state][goal] for goal in Q[state].keys()]
-        if len(values)==0:
-            best_action = np.random.randint(env.action_space.n)
-        else:
-            values = np.max(values,axis=0)
-            best_action = np.random.choice(np.flatnonzero(values == values.max()))
-        probs[best_action] += 1.0 - epsilon
-        return probs
-
-    return policy_improved
-
-def softmax_policy_improvement(env, Q, tau=1):
-
-    def policy_improved(state):
-        q_values = Q[state]
-        exp_q = np.exp(q_values / tau)
-        probs = exp_q / np.sum(exp_q)
-        return probs
-
-    return policy_improved
-
-def softmax_generalised_policy_improvement(env, Q, tau=100):
-
-    def policy_improved(state, goal=None):
-        if goal:
-            q_values = Q[state][goal]
-        else:
-            values = [Q[state][goal] for goal in Q[state].keys()]
-            if len(values)==0:
-                q_values = np.zeros(env.action_space.n)
-            else:
-                q_values = np.max(values,axis=0)
-        exp_q = np.exp(q_values / tau)
-        probs = exp_q / np.sum(exp_q)
-        return probs
-    
-    return policy_improved
 
 #########################################################################################
 def Q_learning(env, Q_optimal=None, gamma=1, alpha=1, maxiter=100, maxstep=100):
@@ -188,14 +197,13 @@ def Q_learning(env, Q_optimal=None, gamma=1, alpha=1, maxiter=100, maxstep=100):
     """
     n_heads = 10
     Q_list = [defaultdict(lambda: np.zeros(env.action_space.n)) for _ in range(n_heads)]
-    behaviour_policy = bootstrapped_dqn_policy_improvement(env, Q_list, method="average")
+    behaviour_policy = bayesian_dqn_policy_improvement(env, Q_list, method="average")
+
     stop_cond = lambda k: k < maxiter
     # Q_optimal check is not supported for Q_list directly
 
     stats = {"R":[], "T":0}
     k=0
-    mask_prob = 0.9  # 80% chance each head is active per episode
-    masks = np.random.binomial(1, mask_prob, size=(maxiter, n_heads))
     T=0
     state = env.reset()
     stats["R"].append(0)
@@ -204,14 +212,11 @@ def Q_learning(env, Q_optimal=None, gamma=1, alpha=1, maxiter=100, maxstep=100):
         action = np.random.choice(np.arange(len(probs)), p=probs)
         state_, reward, done, _ = env.step(action)
         stats["R"][k] += reward
-        for idx, Q in enumerate(Q_list):
-            if masks[k, idx]:
-                G = 0 if done else np.max(Q[state_])
-                TD_target = reward + gamma*G
-                TD_error = TD_target - Q[state][action]
-                Q[state][action] = Q[state][action] + alpha*TD_error
-                # Print all Q-values for this head and state after update
-                print(f"Head {idx} | State {state} | Q-values: {Q[state]}")
+        for Q in Q_list:
+            G = 0 if done else np.max(Q[state_])
+            TD_target = reward + gamma*G
+            TD_error = TD_target - Q[state][action]
+            Q[state][action] = Q[state][action] + alpha*TD_error
         state = state_
         T+=1
         if done:
@@ -222,6 +227,7 @@ def Q_learning(env, Q_optimal=None, gamma=1, alpha=1, maxiter=100, maxstep=100):
     return Q_list, stats
 
 def Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None, gamma=1, alpha=1, maxiter=100, maxstep=100):
+
     """
     Implements Bootstrapped DQN (BDQN) Goal Oriented Q-learning
 
@@ -239,7 +245,7 @@ def Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None, gamma=1, alpha=
     n_heads = 10
     N = min(env.rmin, (env.rmin-env.rmax)*env.diameter)
     Q_list = [defaultdict(lambda: defaultdict(lambda: np.zeros(env.action_space.n))) for _ in range(n_heads)]
-    behaviour_policy = bootstrapped_generalised_policy_improvement(env, Q_list, method="average")
+    behaviour_policy = bayesian_generalised_dqn_policy_improvement(env, Q_list, method="average")
 
     sMem = {}
     if T_states:
@@ -252,8 +258,6 @@ def Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None, gamma=1, alpha=
     stats = {"R": [], "T": 0}
     k = 0
     T = 0
-    mask_prob = 0.9  # 90% chance each head is active per episode
-    masks = np.random.binomial(1, mask_prob, size=(maxiter, n_heads))
     state = env.reset()
     stats["R"].append(0)
     while stop_cond(k):
@@ -261,26 +265,25 @@ def Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None, gamma=1, alpha=
         action = np.random.choice(np.arange(len(probs)), p=probs)
         state_, reward, done, _ = env.step(action)
         stats["R"][k] += reward
+        if done:
+            sMem[state] = 0
         for goal in sMem.keys():
             if state != goal and done:
                 reward_ = N
             else:
                 reward_ = reward
-            for idx, Q in enumerate(Q_list):
-                if masks[k, idx]:
-                    if state not in Q:
-                        Q[state] = defaultdict(lambda: np.zeros(env.action_space.n))
-                    if goal not in Q[state]:
-                        Q[state][goal] = np.zeros(env.action_space.n)
-                    if state_ in Q and goal in Q[state_]:
-                        G = 0 if done else np.max(Q[state_][goal])
-                    else:
-                        G = 0
-                    TD_target = reward_ + gamma * G
-                    TD_error = TD_target - Q[state][goal][action]
-                    Q[state][goal][action] = Q[state][goal][action] + alpha * TD_error
-                    # Print all Q-values for this head, state, and goal after update
-                    print(f"Head {idx} | State {state} | Goal {goal} | Q-values: {Q[state][goal]}")
+            for Q in Q_list:
+                if state not in Q:
+                    Q[state] = defaultdict(lambda: np.zeros(env.action_space.n))
+                if goal not in Q[state]:
+                    Q[state][goal] = np.zeros(env.action_space.n)
+                if state_ in Q and goal in Q[state_]:
+                    G = 0 if done else np.max(Q[state_][goal])
+                else:
+                    G = 0
+                TD_target = reward_ + gamma * G
+                TD_error = TD_target - Q[state][goal][action]
+                Q[state][goal][action] = Q[state][goal][action] + alpha * TD_error
         state = state_
         T += 1
         if done:

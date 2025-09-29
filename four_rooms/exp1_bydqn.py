@@ -2,9 +2,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import deepdish as dd
 from GridWorld import GridWorld
-from MNFDQN_library import *
-
-
+from bydqn_library import *
 
 env = GridWorld()
 maxiter=300
@@ -18,8 +16,8 @@ EQs = dd.io.load('exps_data/4Goals_Optimal_EQs.h5')
 EQs = [{s:{s__:v__ for (s__,v__) in v} for (s,v) in EQ} for EQ in EQs]
 
 num_runs = 1
-dataQ = np.zeros((num_runs,len(Tasks))) 
-dataEQ = np.zeros((num_runs,len(Tasks))) 
+dataQ = np.zeros((num_runs,len(Tasks)))
+dataEQ = np.zeros((num_runs,len(Tasks)))
 idxs=np.arange(len(Tasks))
 for i in range(num_runs):
     print("run: ",i)
@@ -33,8 +31,8 @@ for i in range(num_runs):
         _,stats = Goal_Oriented_Q_learning(env, Q_optimal=EQs[j])
         dataEQ[i,j] = stats["T"]
 
-data1 = dd.io.save('exps_data/bdqn/exp1_epsilon_samples_Qs.h5', dataQ)
-data2 = dd.io.save('exps_data/bdqn/exp1_bdqn_samples_EQs.h5', dataEQ)
+data1 = dd.io.save('exps_data/bydqn/exp1_bydqn_samples_Qs.h5', dataQ)
+data2 = dd.io.save('exps_data/bydqn/exp1_bydqn_samples_EQs.h5', dataEQ)
 
 
 

@@ -314,5 +314,71 @@ def plot_bdqn_bar():
     fig.savefig("plots/bdqn_average_cum_bar.pdf", bbox_inches='tight')
 #####################################################################################
 
+def plot_bydqn_bar():
+    data1 = dd.io.load('exps_data/bydqn/exp1_bydqn_samples_Qs.h5')
+    data2 = dd.io.load('exps_data/bydqn/exp1_bydqn_samples_EQs.h5')
+
+    mean1 = np.cumsum(data1.mean(axis=0))
+    std1 = data1.std(axis=0)
+    mean2 = np.cumsum(data2.mean(axis=0))
+    std2 = data2.std(axis=0)
+
+    s = 20
+    rc_ = {'figure.figsize':(11,8),'axes.labelsize': 30, 'xtick.labelsize': s, 
+        'ytick.labelsize': s, 'legend.fontsize': 25}
+    sns.set(rc=rc_, style="darkgrid")
+    rc('text', usetex=True)
+
+    fig,ax=plt.subplots()
+    # Plot the bar with the smaller mean value last (so it is visually on top)
+    if mean1[-1] < mean2[-1]:
+        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label=r"Extended $Q$-function")
+        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label=r"$Q$-function")
+    else:
+        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label=r"$Q$-function")
+        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label=r"Extended $Q$-function")
+    plt.legend()
+    plt.xlabel("Number of tasks")
+    plt.ylabel('Cumulative timesteps to converge')
+    ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
+    plt.xlim(0, 17)
+    # plt.show()
+    fig.savefig("plots/bydqn_average_cum_bar.pdf", bbox_inches='tight')
+
+#####################################################################################
+
+def plot_bdqn_epsilon_bar():
+    data1 = dd.io.load('exps_data/bdqn_epsilon/exp1_epsilon_samples_Qs.h5')
+    data2 = dd.io.load('exps_data/bdqn_epsilon/exp1_bdqn_samples_EQs.h5')
+
+    mean1 = np.cumsum(data1.mean(axis=0))
+    std1 = data1.std(axis=0)
+    mean2 = np.cumsum(data2.mean(axis=0))
+    std2 = data2.std(axis=0)
+
+    s = 20
+    rc_ = {'figure.figsize':(11,8),'axes.labelsize': 30, 'xtick.labelsize': s, 
+        'ytick.labelsize': s, 'legend.fontsize': 25}
+    sns.set(rc=rc_, style="darkgrid")
+    rc('text', usetex=True)
+
+    fig,ax=plt.subplots()
+    # Plot the bar with the smaller mean value last (so it is visually on top)
+    if mean1[-1] < mean2[-1]:
+        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label=r"Extended $Q$-function")
+        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label=r"$Q$-function")
+    else:
+        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label=r"$Q$-function")
+        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label=r"Extended $Q$-function")
+    plt.legend()
+    plt.xlabel("Number of tasks")
+    plt.ylabel('Cumulative timesteps to converge')
+    ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
+    plt.xlim(0, 17)
+    # plt.show()
+    fig.savefig("plots/bdqn_epsilon_average_cum_bar.pdf", bbox_inches='tight')
+
 plot_bdqn_bar()
+plot_bydqn_bar()
+plot_bdqn_epsilon_bar()
 
