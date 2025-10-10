@@ -160,6 +160,58 @@ def plot4():
 
 #####################################################################################
 
+def plot4_bdqn():
+    tasks = [r'${M_{\emptyset}}$',
+              r'${M_{\mathcal{U}}}$',
+              r'${M_{T}}\wedge{M_{L}}$',
+              r'${M_{T}}\wedge\neg{M_{L}}$',
+              r'${M_{L}}\wedge\neg{M_{T}}$',
+              r'${M_{T}}\bar{\vee}{M_{L}}$',
+              r'${M_{T}}$',
+              r'$\neg {M_{T}}$',
+              r'${M_{L}}$',
+              r'$\neg {M_{L}}$',
+              r'${M_{T}}\vee{M_{L}}$',
+              r'${M_{T}}\vee\neg{M_{L}}$',
+              r'${M_{L}}\vee\neg{M_{T}}$',
+              r'${M_{T}}\bar{\wedge}{M_{L}}$',
+              r'$\neg({M_{T}} \veebar {M_{L}})$',
+              r'${M_{T}} \veebar {M_{L}}$'
+              ]
+
+    plt.ylim(-0.5, 2)
+    rc_ = {'figure.figsize':(30,10),'axes.labelsize': 30, 'font.size': 30, 
+          'legend.fontsize': 20, 'axes.titlesize': 30}
+    sns.set(rc=rc_, style="darkgrid",font_scale = 1.8)
+    rc('text', usetex=False)
+
+    n = 2
+
+    data0 = dd.io.load('exps_data/exp3_bdqn_returns_0.h5')/10
+    data1 = dd.io.load('exps_data/exp3_bdqn_returns_2.h5')/10
+    data2 = dd.io.load('exps_data/exp3_bdqn_returns_1.h5')/10
+    data3 = dd.io.load('exps_data/exp3_bdqn_returns_3.h5')/10
+
+    types = ["Sparse rewards and Same absorbing set (BDQN)",
+              "Dense rewards and Same absorbing set (BDQN)",
+              "Sparse rewards and Different absorbing set (BDQN)",
+              "Dense rewards and Different absorbing set (BDQN)",
+            ]
+
+    data = pd.DataFrame(
+    [[data0[i,t] for t in range(n,16)]+[types[0]] for i in range(len(data1))] +
+    [[data1[i,t] for t in range(n,16)]+[types[1]] for i in range(len(data1))] +
+    [[data2[i,t] for t in range(n,16)]+[types[2]] for i in range(len(data1))] +
+    [[data3[i,t] for t in range(n,16)]+[types[3]] for i in range(len(data1))],
+      columns=tasks[n:]+["Domain"])
+    data = pd.melt(data, "Domain", var_name="Tasks", value_name="Average Returns")
+
+    fig, ax = plt.subplots()
+    ax = sns.boxplot(x="Tasks", y="Average Returns", hue="Domain", data=data, linewidth=3, showfliers = False)
+    fig.savefig("plots/dense_bdqn.pdf", bbox_inches='tight')
+
+#####################################################################################
+
 def plot5():
     tasks = [r'${M_{\emptyset}}$',
               r'${M_{\mathcal{U}}}$',
@@ -205,6 +257,44 @@ def plot5():
         ax = sns.boxplot(x="Tasks", y="Average Returns", hue="", data=data, linewidth=3, showfliers = False)
         # plt.show()
         fig.savefig("plots/dense_sp_"+str(i)+".pdf", bbox_inches='tight')
+
+def bdqn_plot5():
+    tasks = [r'${M_{\emptyset}}$',
+              r'${M_{\mathcal{U}}}$',
+              r'${M_{T}}\wedge{M_{L}}$',
+              r'${M_{T}}\wedge\neg{M_{L}}$',
+              r'${M_{L}}\wedge\neg{M_{T}}$',
+              r'${M_{T}}\bar{\vee}{M_{L}}$',
+              r'${M_{T}}$',
+              r'$\neg {M_{T}}$',
+              r'${M_{L}}$',
+              r'$\neg {M_{L}}$',
+              r'${M_{T}}\vee{M_{L}}$',
+              r'${M_{T}}\vee\neg{M_{L}}$',
+              r'${M_{L}}\vee\neg{M_{T}}$',
+              r'${M_{T}}\bar{\wedge}{M_{L}}$',
+              r'$\neg({M_{T}} \veebar {M_{L}})$',
+              r'${M_{T}} \veebar {M_{L}}$'
+              ]
+        
+    s = 20
+    rc_ = {'figure.figsize':(30,10),'axes.labelsize': 30, 'font.size': 30, 
+          'legend.fontsize': 20, 'axes.titlesize': 30}
+    sns.set(rc=rc_, style="darkgrid",font_scale = 1.8)
+    rc('text', usetex=False)
+    
+    n = 2
+    
+    for i in range(4):
+        data0 = dd.io.load('exps_data/exp5_bdqn_returns_'+str(i)+'.h5')[:1000,:]
+        data = pd.DataFrame(
+            [[data0[j,t] for t in range(n,16)] for j in range(len(data0))],
+            columns=tasks[n:]
+        )
+        data = pd.melt(data, var_name="Tasks", value_name="Average Returns")
+        fig, ax = plt.subplots()
+        ax = sns.boxplot(x="Tasks", y="Average Returns", data=data, linewidth=3, showfliers=False)
+        fig.savefig(f"plots/dense_sp_bdqn_only_exp5_{i}.pdf", bbox_inches='tight')
 
 #####################################################################################
 
@@ -282,9 +372,9 @@ def hyper_plot_epsilon():
 
 #####################################################################################
 
-def plot_bdqn_bar():
-    data1 = dd.io.load('exps_data/bdqn/exp1_epsilon_samples_Qs.h5')
-    data2 = dd.io.load('exps_data/bdqn/exp1_bdqn_samples_EQs.h5')
+def plot_bdqn_EQ_vs_epsilon_bar_EQ():
+    data1 = dd.io.load('exps_data/exp1_bdqn_samples_EQs.h5')
+    data2 = dd.io.load('exps_data/exp1_samples_EQs.h5')
 
     mean1 = np.cumsum(data1.mean(axis=0))
     std1 = data1.std(axis=0)
@@ -300,56 +390,59 @@ def plot_bdqn_bar():
     fig,ax=plt.subplots()
     # Plot the bar with the smaller mean value last (so it is visually on top)
     if mean1[-1] < mean2[-1]:
-        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label=r"Extended $Q$-function")
-        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label=r"$Q$-function")
+        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label="Standard EQ-learning")
+        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label="BDQN EQ-learning")
     else:
-        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label=r"$Q$-function")
-        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label=r"Extended $Q$-function")
+        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label="BDQN EQ-learning")
+        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label="Standard EQ-learning")
     plt.legend()
+    plt.title("BDQN EQ-learning vs Standard EQ-learning\n(Cumulative Timesteps to Solve Tasks)")
     plt.xlabel("Number of tasks")
-    plt.ylabel('Cumulative timesteps to converge')
+    plt.ylabel('Cumulative timesteps to solve all tasks')
     ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
     plt.xlim(0, 17)
     # plt.show()
-    fig.savefig("plots/bdqn_average_cum_bar.pdf", bbox_inches='tight')
-#####################################################################################
-
-def plot_bydqn_bar():
-    data1 = dd.io.load('exps_data/bydqn/exp1_bydqn_samples_Qs.h5')
-    data2 = dd.io.load('exps_data/bydqn/exp1_bydqn_samples_EQs.h5')
-
-    mean1 = np.cumsum(data1.mean(axis=0))
-    std1 = data1.std(axis=0)
-    mean2 = np.cumsum(data2.mean(axis=0))
-    std2 = data2.std(axis=0)
-
-    s = 20
-    rc_ = {'figure.figsize':(11,8),'axes.labelsize': 30, 'xtick.labelsize': s, 
-        'ytick.labelsize': s, 'legend.fontsize': 25}
-    sns.set(rc=rc_, style="darkgrid")
-    rc('text', usetex=True)
-
-    fig,ax=plt.subplots()
-    # Plot the bar with the smaller mean value last (so it is visually on top)
-    if mean1[-1] < mean2[-1]:
-        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label=r"Extended $Q$-function")
-        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label=r"$Q$-function")
-    else:
-        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label=r"$Q$-function")
-        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label=r"Extended $Q$-function")
-    plt.legend()
-    plt.xlabel("Number of tasks")
-    plt.ylabel('Cumulative timesteps to converge')
-    ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
-    plt.xlim(0, 17)
-    # plt.show()
-    fig.savefig("plots/bydqn_average_cum_bar.pdf", bbox_inches='tight')
+    fig.savefig("plots/plot_bdqn_EQ_vs_epsilon_bar_EQ.pdf", bbox_inches='tight')
 
 #####################################################################################
 
-def plot_bdqn_epsilon_bar():
-    data1 = dd.io.load('exps_data/bdqn_epsilon/exp1_epsilon_samples_Qs.h5')
-    data2 = dd.io.load('exps_data/bdqn_epsilon/exp1_bdqn_samples_EQs.h5')
+def plot_bdqn_EQ_vs_epsilon_Q_bar():
+    data1 = dd.io.load('exps_data/exp1_bdqn_samples_EQs.h5')
+    data2 = dd.io.load('exps_data/exp1_samples_Qs.h5')
+    
+    mean1 = np.cumsum(data1.mean(axis=0))
+    std1 = data1.std(axis=0)
+    mean2 = np.cumsum(data2.mean(axis=0))
+    std2 = data2.std(axis=0)
+
+    s = 20
+    rc_ = {'figure.figsize':(11,8),'axes.labelsize': 30, 'xtick.labelsize': s, 
+        'ytick.labelsize': s, 'legend.fontsize': 25}
+    sns.set(rc=rc_, style="darkgrid")
+    rc('text', usetex=True)
+
+    fig,ax=plt.subplots()
+    # Plot the bar with the smaller mean value last (so it is visually on top)
+    if mean1[-1] < mean2[-1]:
+        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label="Standard Q-learning")
+        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label="BDQN EQ-learning")
+    else:
+        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label="BDQN EQ-learning")
+        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label="Standard Q-learning")
+    plt.legend()
+    plt.title("BDQN EQ-learning vs Standard Q-learning\n(Cumulative Timesteps to Solve Tasks)")
+    plt.xlabel("Number of tasks")
+    plt.ylabel('Cumulative timesteps to solve all tasks')
+    ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
+    plt.xlim(0, 17)
+    # plt.show()
+    fig.savefig("plots/plot_bdqn_EQ_vs_epsilon_Q_bar.pdf", bbox_inches='tight')
+
+#####################################################################################
+
+def plot_bdqn_EQ_vs_bdqn_Q_bar():
+    data1 = dd.io.load('exps_data/exp1_bdqn_samples_EQs.h5')
+    data2 = dd.io.load('exps_data/exp1_bdqn_samples_Qs.h5')
 
     mean1 = np.cumsum(data1.mean(axis=0))
     std1 = data1.std(axis=0)
@@ -365,20 +458,61 @@ def plot_bdqn_epsilon_bar():
     fig,ax=plt.subplots()
     # Plot the bar with the smaller mean value last (so it is visually on top)
     if mean1[-1] < mean2[-1]:
-        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label=r"Extended $Q$-function")
-        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label=r"$Q$-function")
+        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label="BDQN Q-learning")
+        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label="BDQN EQ-learning")
     else:
-        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label=r"$Q$-function")
-        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label=r"Extended $Q$-function")
+        ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label="BDQN EQ-learning")
+        ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label="BDQN Q-learning")
     plt.legend()
+    plt.title("BDQN EQ-learning vs BDQN Q-learning\n(Cumulative Timesteps to Solve Tasks)")
     plt.xlabel("Number of tasks")
-    plt.ylabel('Cumulative timesteps to converge')
+    plt.ylabel('Cumulative timesteps to solve all tasks')
     ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
     plt.xlim(0, 17)
     # plt.show()
-    fig.savefig("plots/bdqn_epsilon_average_cum_bar.pdf", bbox_inches='tight')
+    fig.savefig("plots/plot_bdqn_EQ_vs_bdqn_Q_bar.pdf", bbox_inches='tight')
 
-plot_bdqn_bar()
-plot_bydqn_bar()
-plot_bdqn_epsilon_bar()
+#####################################################################################
 
+
+def baseline():
+    """
+    Baseline comparison: Standard Q-learning vs Extended Q-learning (both epsilon-greedy)
+    """
+    data1 = dd.io.load('exps_data/exp1_samples_Qs.h5')
+    data2 = dd.io.load('exps_data/exp1_samples_EQs.h5')
+    
+    mean1 = np.cumsum(data1.mean(axis=0))
+    std1 = data1.std(axis=0)
+    mean2 = np.cumsum(data2.mean(axis=0))
+    std2 = data2.std(axis=0)
+    
+    s = 20
+    rc_ = {'figure.figsize':(11,8),'axes.labelsize': 30, 'xtick.labelsize': s, 
+           'ytick.labelsize': s, 'legend.fontsize': 25}
+    sns.set(rc=rc_, style="darkgrid")
+    rc('text', usetex=True)
+    
+    fig,ax=plt.subplots()
+    ax.bar(range(1,17), mean2, yerr=std2, align='center', ecolor='black', capsize=5, label="Extended Q-learning (epsilon-greedy)")
+    ax.bar(range(1,17), mean1, yerr=std1, align='center', ecolor='black', capsize=5, label="Standard Q-learning (epsilon-greedy)")
+    plt.legend()
+    plt.title("Standard vs Extended Q-learning (Epsilon-Greedy)\nCumulative Timesteps to Solve Tasks")
+    plt.xlabel("Number of tasks")
+    plt.ylabel('Cumulative timesteps to solve all tasks')
+    ax.yaxis.get_major_formatter().set_powerlimits((0, 1))
+    plt.xlim(0, 17)
+    # plt.show()
+    fig.savefig("plots/baseline.pdf", bbox_inches='tight')
+
+
+#####################################################################################
+
+
+
+
+baseline()
+plot_bdqn_EQ_vs_epsilon_bar_EQ()
+plot_bdqn_EQ_vs_epsilon_Q_bar()
+plot_bdqn_EQ_vs_bdqn_Q_bar()
+plot4_bdqn()
