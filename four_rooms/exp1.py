@@ -21,8 +21,6 @@ num_runs = 5
 dataQ = np.zeros((num_runs,len(Tasks))) 
 dataEQ = np.zeros((num_runs,len(Tasks))) 
 
-rewardsQ = np.zeros((num_runs,len(Tasks),400))
-rewardsEQ = np.zeros((num_runs,len(Tasks),400))
 idxs=np.arange(len(Tasks))
 for i in range(num_runs):
     print("run: ",i)

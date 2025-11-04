@@ -160,7 +160,8 @@ def plot4():
 
 #####################################################################################
 
-def plot4_bdqn():
+def dense_bdqn():
+    """Generate filtered BDQN plot excluding specific Boolean task compositions"""
     tasks = [r'${M_{\emptyset}}$',
               r'${M_{\mathcal{U}}}$',
               r'${M_{T}}\wedge{M_{L}}$',
@@ -179,8 +180,24 @@ def plot4_bdqn():
               r'${M_{T}} \veebar {M_{L}}$'
               ]
 
-    plt.ylim(-0.5, 2)
-    rc_ = {'figure.figsize':(30,10),'axes.labelsize': 30, 'font.size': 30, 
+    # Exclude specific tasks: MT AND ¬ML, ML AND ¬MT, MT XOR ML, ¬MT, ¬ML, ¬(MT XOR ML), MT NOR ML
+    # Indices to exclude: 3, 4, 5, 7, 9, 14, 15 
+    # (MT AND ¬ML, ML AND ¬MT, MT NOR ML, ¬MT, ¬ML, ¬(MT XOR ML), MT XOR ML)
+    exclude_indices = {3, 4, 5, 7, 9, 14, 15}
+    
+    # Filter tasks and create mapping for data indices
+    filtered_tasks = [task for i, task in enumerate(tasks) if i not in exclude_indices]
+    
+    # Create mapping from original index to filtered index (after n=2 offset)
+    original_to_filtered = {}
+    filtered_idx = 0
+    for i in range(len(tasks)):
+        if i not in exclude_indices and i >= 2:  # Only include tasks from index 2 onwards
+            original_to_filtered[i] = filtered_idx
+            filtered_idx += 1
+
+    plt.ylim(-1.5, 2)
+    rc_ = {'figure.figsize':(25,10),'axes.labelsize': 30, 'font.size': 30, 
           'legend.fontsize': 20, 'axes.titlesize': 30}
     sns.set(rc=rc_, style="darkgrid",font_scale = 1.8)
     rc('text', usetex=False)
@@ -198,17 +215,89 @@ def plot4_bdqn():
               "Dense rewards and Different absorbing set (BDQN)",
             ]
 
-    data = pd.DataFrame(
-    [[data0[i,t] for t in range(n,16)]+[types[0]] for i in range(len(data1))] +
-    [[data1[i,t] for t in range(n,16)]+[types[1]] for i in range(len(data1))] +
-    [[data2[i,t] for t in range(n,16)]+[types[2]] for i in range(len(data1))] +
-    [[data3[i,t] for t in range(n,16)]+[types[3]] for i in range(len(data1))],
-      columns=tasks[n:]+["Domain"])
+    # Create filtered data by excluding specified task columns
+    filtered_data_rows = []
+    for data_array, type_name in zip([data0, data1, data2, data3], types):
+        for i in range(len(data_array)):
+            row = []
+            for t in range(n, 16):  # Original range
+                if t not in exclude_indices:  # Only include non-excluded tasks
+                    row.append(data_array[i, t])
+            row.append(type_name)
+            filtered_data_rows.append(row)
+
+    data = pd.DataFrame(filtered_data_rows, columns=filtered_tasks[n:]+["Domain"])
     data = pd.melt(data, "Domain", var_name="Tasks", value_name="Average Returns")
 
     fig, ax = plt.subplots()
-    ax = sns.boxplot(x="Tasks", y="Average Returns", hue="Domain", data=data, linewidth=3, showfliers = False)
+    ax = sns.boxplot(x="Tasks", y="Average Returns", hue="Domain", data=data, linewidth=3, showfliers = False, medianprops=dict(color="red", linewidth=3))
+    ax.set_ylim(-0.1, 0.2)  # <-- Set the y-axis limits here, on the axes object
     fig.savefig("plots/dense_bdqn.pdf", bbox_inches='tight')
+
+#####################################################################################
+
+def full_dense_bdqn():
+    """Generate full BDQN plot including all Boolean task compositions"""
+    tasks = [r'${M_{\emptyset}}$',
+              r'${M_{\mathcal{U}}}$',
+              r'${M_{T}}\wedge{M_{L}}$',
+              r'${M_{T}}\wedge\neg{M_{L}}$',
+              r'${M_{L}}\wedge\neg{M_{T}}$',
+              r'${M_{T}}\bar{\vee}{M_{L}}$',
+              r'${M_{T}}$',
+              r'$\neg {M_{T}}$',
+              r'${M_{L}}$',
+              r'$\neg {M_{L}}$',
+              r'${M_{T}}\vee{M_{L}}$',
+              r'${M_{T}}\vee\neg{M_{L}}$',
+              r'${M_{L}}\vee\neg{M_{T}}$',
+              r'${M_{T}}\bar{\wedge}{M_{L}}$',
+              r'$\neg({M_{T}} \veebar {M_{L}})$',
+              r'${M_{T}} \veebar {M_{L}}$'
+              ]
+
+    plt.ylim(-1.5, 2)
+    rc_ = {'figure.figsize':(25,10),'axes.labelsize': 30, 'font.size': 30, 
+          'legend.fontsize': 20, 'axes.titlesize': 30}
+    sns.set(rc=rc_, style="darkgrid",font_scale = 1.8)
+    rc('text', usetex=False)
+
+    n = 2
+
+    data0 = dd.io.load('exps_data/exp3_bdqn_returns_0.h5')/10
+    data1 = dd.io.load('exps_data/exp3_bdqn_returns_2.h5')/10
+    data2 = dd.io.load('exps_data/exp3_bdqn_returns_1.h5')/10
+    data3 = dd.io.load('exps_data/exp3_bdqn_returns_3.h5')/10
+
+    types = ["Sparse rewards and Same absorbing set (BDQN)",
+              "Dense rewards and Same absorbing set (BDQN)",
+              "Sparse rewards and Different absorbing set (BDQN)",
+              "Dense rewards and Different absorbing set (BDQN)",
+            ]
+
+    # Create full data including all tasks (no exclusions)
+    full_data_rows = []
+    for data_array, type_name in zip([data0, data1, data2, data3], types):
+        for i in range(len(data_array)):
+            row = []
+            for t in range(n, 16):  # Include all tasks from index 2 onwards
+                row.append(data_array[i, t])
+            row.append(type_name)
+            full_data_rows.append(row)
+
+    data = pd.DataFrame(full_data_rows, columns=tasks[n:]+["Domain"])
+    data = pd.melt(data, "Domain", var_name="Tasks", value_name="Average Returns")
+
+    fig, ax = plt.subplots()
+    ax = sns.boxplot(x="Tasks", y="Average Returns", hue="Domain", data=data, linewidth=3, showfliers = False, medianprops=dict(color="red", linewidth=3))
+    ax.set_ylim(-0.1, 0.2)  # <-- Set the y-axis limits here, on the axes object
+    fig.savefig("plots/full_dense_bdqn.pdf", bbox_inches='tight')
+
+#####################################################################################
+
+def plot4_bdqn():
+    """Legacy function - calls dense_bdqn for backward compatibility"""
+    dense_bdqn()
 
 #####################################################################################
 
@@ -504,6 +593,7 @@ def baseline():
     plt.xlim(0, 17)
     # plt.show()
     fig.savefig("plots/baseline.pdf", bbox_inches='tight')
+
 
 
 #####################################################################################

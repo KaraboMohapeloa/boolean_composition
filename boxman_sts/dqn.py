@@ -251,10 +251,10 @@ class Agent(object):
             for goal in self.replay_buffer.goals:
                 goal = torch.from_numpy(np.array(goal)).type(FloatTensor).unsqueeze(0)
                 x = torch.cat((obs,goal),dim=3)
-                values.append(self.q_func(Variable(x, volatile=True)).squeeze(0))
+                with torch.no_grad():
+                    values.append(self.q_func(x).squeeze(0))
             values = torch.stack(values,1).t()
-            action = values.data.max(0)[0].max(0)[1].reshape(1, 1) #self.q_func(Variable(obs, volatile=True)).data.max(1)[1].reshape(1, 1)
-            # Use volatile = True if variable is only used in inference mode, i.e. don’t save the history
+            action = values.data.max(0)[0].max(0)[1].reshape(1, 1)
             return action
         else:
             sample_action = self.env.action_space.sample()
@@ -315,7 +315,11 @@ class Agent(object):
 
             self.steps += 1
 
-            mean_100ep_reward = round(np.mean(self.training_stats["R"][-101:-1]), 1)
+            rewards_window = self.training_stats["R"][-101:-1]
+            if len(rewards_window) > 0:
+                mean_100ep_reward = round(np.mean(rewards_window), 1)
+            else:
+                mean_100ep_reward = 0
             num_episodes = len(self.training_stats["R"])
             if done and self.print_freq is not None and num_episodes % self.print_freq == 0:
                 print("--------------------------------------------------------")

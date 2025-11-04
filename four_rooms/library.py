@@ -117,7 +117,7 @@ def Q_learning(env, Q_optimal=None, gamma=1, epsilon=1, alpha=1, maxiter=100, ma
     
     stop_cond = lambda k: k < maxiter
     if Q_optimal:
-        stop_cond = lambda _: not Q_equal(Q_optimal,Q)
+        stop_cond = lambda k: not Q_equal(Q_optimal, Q)
         
     stats = {"R":[], "T":0}
     k=0
@@ -170,7 +170,7 @@ def Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None, gamma=1, epsilo
     
     stop_cond = lambda k: k < maxiter
     if Q_optimal:
-        stop_cond = lambda _: not EQ_equal(Q_optimal,Q)
+        stop_cond = lambda k: not EQ_equal(Q_optimal, Q)
                 
     stats = {"R":[], "T":0}
     k=0
@@ -201,6 +201,7 @@ def Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None, gamma=1, epsilo
         state = state_
         T+=1
         if done:
+            
             state = env.reset()
             stats["R"].append(0)
             k+=1
