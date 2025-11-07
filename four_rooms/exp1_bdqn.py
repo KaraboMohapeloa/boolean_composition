@@ -23,25 +23,23 @@ Qs = [{s:v for (s,v) in Q} for Q in Qs]
 EQs = dd.io.load('exps_data/4Goals_Optimal_EQs.h5')
 EQs = [{s:{s__:v__ for (s__,v__) in v} for (s,v) in EQ} for EQ in EQs]
 
-num_runs = 1
+num_runs = 5
 dataQ = np.zeros((num_runs,len(Tasks))) 
 dataEQ = np.zeros((num_runs,len(Tasks))) 
 
-# Bootstrapped DQN parameters optimized for per-transaction masking
+# Bootstrapped DQN parameters (matching exp3_bdqn.py)
 n_heads = 10        # Moderate ensemble size for good diversity vs convergence
 mask_prob = 0.8     # Per-transaction masking: each transition included in ~80% of heads
-alpha_q = 1       # Learning rate for Q-learning
-alpha_eq = 1      # Learning rate for goal-oriented Q-learning
-init_q_range = 0.2  # Positive random Q-value initialization range [0, init_q_range]
-warmup_steps = 500  # Warmup phase for better per-transaction diversity
+alpha_q = 1         # Learning rate for Q-learning
+alpha_eq = 1        # Learning rate for goal-oriented Q-learning
+init_q_range = 0.2  # Random Q-value initialization range [-init_q_range, init_q_range]
+warmup_steps = 30000  # Warmup phase for better per-transaction diversity (matching exp3_bdqn)
 
 # Policy agreement stopping condition
-policy_agreement_threshold = 0.95  # 95% of states must have policy agreement
+policy_agreement_threshold = 0.95  # 95% of states must have policy agreement (matching exp3_bdqn)
 
 # POLICY-ONLY Convergence Parameters (ignores value differences, focuses on behavior)
-optimality_threshold = 0.8      # 80% of states must match optimal policy
-value_epsilon = 1.0             # [UNUSED in policy-only mode] 
-evf_epsilon = 0.1               # [UNUSED in policy-only mode]
+optimality_threshold = 0.3      # 30% of states must match optimal policy (matching exp3_bdqn)
 
 idxs = np.arange(len(Tasks))
 for i in range(num_runs):
@@ -54,24 +52,22 @@ for i in range(num_runs):
         
         # Bootstrapped Q-learning with ensemble policy agreement stopping condition
         print(f"  Starting Q-learning...")
-        _, stats = Bootstrapped_Q_learning(env, Q_optimal=Qs[j], maxiter=maxiter, 
+        _, stats = Bootstrapped_Q_learning(env, Q_optimal=Qs[j], 
                                          n_heads=n_heads, mask_prob=mask_prob, alpha=alpha_q,
                                          init_q_range=init_q_range, warmup_steps=warmup_steps,
                                          policy_agreement_threshold=policy_agreement_threshold,
-                                         optimality_threshold=optimality_threshold,
-                                         value_epsilon=value_epsilon)
+                                         optimality_threshold=optimality_threshold)
         dataQ[i,j] = stats["T"]
         print(f"  Q-learning completed in {stats['T']} steps")
         
         # Bootstrapped Goal-Oriented Q-learning with ensemble policy agreement stopping condition
         print(f"  Starting Goal-Oriented Q-learning...")
-        _, stats = Bootstrapped_Goal_Oriented_Q_learning(env, T_states=T_states, Q_optimal=EQs[j], 
-                                                        maxiter=maxiter, n_heads=n_heads, 
+        _, stats = Bootstrapped_Goal_Oriented_Q_learning(env, T_states=T_states, Q_optimal=EQs[j],
+                                                        n_heads=n_heads, 
                                                         mask_prob=mask_prob, alpha=alpha_eq,
                                                         init_q_range=init_q_range, warmup_steps=warmup_steps,
                                                         policy_agreement_threshold=policy_agreement_threshold,
-                                                        optimality_threshold=optimality_threshold,
-                                                        evf_epsilon=evf_epsilon)
+                                                        optimality_threshold=optimality_threshold)
         dataEQ[i,j] = stats["T"]
         print(f"  Goal-Oriented Q-learning completed in {stats['T']} steps")
 

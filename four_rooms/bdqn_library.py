@@ -905,11 +905,15 @@ def Bootstrapped_Q_learning(env, Q_optimal=None, gamma=1, alpha=0.1,
     Q -- Ensemble averaged Q function (compatible with library.py)
     stats -- Statistics dictionary matching library.py format
     """
-    # Initialize ensemble of Q-functions with positive random initialization
+    # Initialize ensemble of Q-functions with random initialization
+    # NOTE: Original Bootstrapped DQN uses shared initialization (all heads start the same)
+    # Diversity comes from bootstrap masking, not different initializations
     def create_random_q_function():
         def random_init():
             if init_q_range > 0:
-                return np.random.uniform(0, init_q_range, env.action_space.n)  # Only positive values [0, init_q_range]
+                # Small random initialization centered at 0 (standard practice)
+                # Positive-only initialization creates optimistic bias
+                return np.random.uniform(-init_q_range, init_q_range, env.action_space.n)
             else:
                 return np.zeros(env.action_space.n)
         return defaultdict(random_init)
@@ -1179,12 +1183,16 @@ def Bootstrapped_Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None,
     """
     N = min(env.rmin, (env.rmin - env.rmax) * env.diameter)
     
-    # Initialize ensemble of Extended Q-functions with positive random initialization
+    # Initialize ensemble of Extended Q-functions with random initialization
+    # NOTE: Original Bootstrapped DQN uses shared initialization (all heads start the same)
+    # Diversity comes from bootstrap masking, not different initializations
     def create_random_eq_function():
         def random_init_goal():
             def random_init():
                 if init_q_range > 0:
-                    return np.random.uniform(0, init_q_range, env.action_space.n)  # Only positive values [0, init_q_range]
+                    # Small random initialization centered at 0 (standard practice)
+                    # Positive-only initialization creates optimistic bias
+                    return np.random.uniform(-init_q_range, init_q_range, env.action_space.n)
                 else:
                     return np.zeros(env.action_space.n)
             return defaultdict(random_init)
@@ -1499,12 +1507,16 @@ def Bootstrapped_Goal_Oriented_Q_learning_with_ensemble(env, T_states=None, Q_op
     # Call the original function and capture internals
     N = min(env.rmin, (env.rmin - env.rmax) * env.diameter)
     
-    # Initialize ensemble of Extended Q-functions with positive random initialization
+    # Initialize ensemble of Extended Q-functions with random initialization
+    # NOTE: Original Bootstrapped DQN uses shared initialization (all heads start the same)
+    # Diversity comes from bootstrap masking, not different initializations
     def create_random_eq_function():
         def random_init_goal():
             def random_init():
                 if init_q_range > 0:
-                    return np.random.uniform(0, init_q_range, env.action_space.n)  # Only positive values [0, init_q_range]
+                    # Small random initialization centered at 0 (standard practice)
+                    # Positive-only initialization creates optimistic bias
+                    return np.random.uniform(-init_q_range, init_q_range, env.action_space.n)
                 else:
                     return np.zeros(env.action_space.n)
             return defaultdict(random_init)

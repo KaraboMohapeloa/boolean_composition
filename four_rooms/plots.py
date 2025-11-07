@@ -133,10 +133,10 @@ def plot4():
     n = 2
     
     #data0 = dd.io.load('exps_data/trash/exp3_returns_optimal.h5')
-    data0 = dd.io.load('exps_data/exp3_returns_0.h5')/10
-    data1 = dd.io.load('exps_data/exp3_returns_2.h5')/10
-    data2 = dd.io.load('exps_data/exp3_returns_1.h5')/10
-    data3 = dd.io.load('exps_data/exp3_returns_3.h5')/10
+    data0 = dd.io.load('exps_data/exp3_returns_0.h5')
+    data1 = dd.io.load('exps_data/exp3_returns_2.h5')
+    data2 = dd.io.load('exps_data/exp3_returns_1.h5')
+    data3 = dd.io.load('exps_data/exp3_returns_3.h5')
     
     types = ["Sparse rewards and Same absorbing set",
               "Dense rewards and Same absorbing set",
@@ -157,6 +157,73 @@ def plot4():
     # plt.show()
     fig.savefig("plots/dense.pdf", bbox_inches='tight')
 
+
+#####################################################################################
+
+def plot4_filtered():
+    """Generate filtered plot (non-BDQN) excluding specific Boolean task compositions - matches plot4_bdqn()"""
+    tasks = [r'${M_{\emptyset}}$',
+              r'${M_{\mathcal{U}}}$',
+              r'${M_{T}}\wedge{M_{L}}$',
+              r'${M_{T}}\wedge\neg{M_{L}}$',
+              r'${M_{L}}\wedge\neg{M_{T}}$',
+              r'${M_{T}}\bar{\vee}{M_{L}}$',
+              r'${M_{T}}$',
+              r'$\neg {M_{T}}$',
+              r'${M_{L}}$',
+              r'$\neg {M_{L}}$',
+              r'${M_{T}}\vee{M_{L}}$',
+              r'${M_{T}}\vee\neg{M_{L}}$',
+              r'${M_{L}}\vee\neg{M_{T}}$',
+              r'${M_{T}}\bar{\wedge}{M_{L}}$',
+              r'$\neg({M_{T}} \veebar {M_{L}})$',
+              r'${M_{T}} \veebar {M_{L}}$'
+              ]
+
+    # Exclude specific tasks: MT AND ¬ML, ML AND ¬MT, MT XOR ML, ¬MT, ¬ML, ¬(MT XOR ML), MT NOR ML
+    # Indices to exclude: 3, 4, 5, 7, 9, 14, 15 
+    exclude_indices = {3, 4, 5, 7, 9, 14, 15}
+    
+    # Filter tasks
+    filtered_tasks = [task for i, task in enumerate(tasks) if i not in exclude_indices]
+
+    plt.ylim(-0.5, 2)
+    rc_ = {'figure.figsize':(25,10),'axes.labelsize': 30, 'font.size': 30, 
+          'legend.fontsize': 20, 'axes.titlesize': 30}
+    sns.set(rc=rc_, style="darkgrid",font_scale = 1.8)
+    rc('text', usetex=False)
+
+    n = 2
+
+    data0 = dd.io.load('exps_data/exp3_returns_0.h5')
+    data1 = dd.io.load('exps_data/exp3_returns_2.h5')
+    data2 = dd.io.load('exps_data/exp3_returns_1.h5')
+    data3 = dd.io.load('exps_data/exp3_returns_3.h5')
+
+    types = ["Sparse rewards and Same absorbing set",
+              "Dense rewards and Same absorbing set",
+              "Sparse rewards and Different absorbing set",
+              "Dense rewards and Different absorbing set",
+            ]
+
+    # Create filtered data by excluding specified task columns
+    filtered_data_rows = []
+    for data_array, type_name in zip([data0, data1, data2, data3], types):
+        for i in range(len(data_array)):
+            row = []
+            for t in range(n, 16):  # Original range
+                if t not in exclude_indices:  # Only include non-excluded tasks
+                    row.append(data_array[i, t])
+            row.append(type_name)
+            filtered_data_rows.append(row)
+
+    data = pd.DataFrame(filtered_data_rows, columns=filtered_tasks[n:]+["Domain"])
+    data = pd.melt(data, "Domain", var_name="Tasks", value_name="Average Returns")
+
+    fig, ax = plt.subplots()
+    ax = sns.boxplot(x="Tasks", y="Average Returns", hue="Domain", data=data, linewidth=3, showfliers = False)
+    ax.set_ylim(-0.5, 2)
+    fig.savefig("plots/dense_filtered.pdf", bbox_inches='tight')
 
 #####################################################################################
 
@@ -204,10 +271,10 @@ def dense_bdqn():
 
     n = 2
 
-    data0 = dd.io.load('exps_data/exp3_bdqn_returns_0.h5')/10
-    data1 = dd.io.load('exps_data/exp3_bdqn_returns_2.h5')/10
-    data2 = dd.io.load('exps_data/exp3_bdqn_returns_1.h5')/10
-    data3 = dd.io.load('exps_data/exp3_bdqn_returns_3.h5')/10
+    data0 = dd.io.load('exps_data/exp3_bdqn_returns_0.h5')
+    data1 = dd.io.load('exps_data/exp3_bdqn_returns_2.h5')
+    data2 = dd.io.load('exps_data/exp3_bdqn_returns_1.h5')
+    data3 = dd.io.load('exps_data/exp3_bdqn_returns_3.h5')
 
     types = ["Sparse rewards and Same absorbing set (BDQN)",
               "Dense rewards and Same absorbing set (BDQN)",
@@ -230,8 +297,8 @@ def dense_bdqn():
     data = pd.melt(data, "Domain", var_name="Tasks", value_name="Average Returns")
 
     fig, ax = plt.subplots()
-    ax = sns.boxplot(x="Tasks", y="Average Returns", hue="Domain", data=data, linewidth=3, showfliers = False, medianprops=dict(color="red", linewidth=3))
-    ax.set_ylim(-0.1, 0.2)  # <-- Set the y-axis limits here, on the axes object
+    ax = sns.boxplot(x="Tasks", y="Average Returns", hue="Domain", data=data, linewidth=3, showfliers = False)
+    ax.set_ylim(-0.5, 2) # <-- Set the y-axis limits here, on the axes object
     fig.savefig("plots/dense_bdqn.pdf", bbox_inches='tight')
 
 #####################################################################################
@@ -264,10 +331,10 @@ def full_dense_bdqn():
 
     n = 2
 
-    data0 = dd.io.load('exps_data/exp3_bdqn_returns_0.h5')/10
-    data1 = dd.io.load('exps_data/exp3_bdqn_returns_2.h5')/10
-    data2 = dd.io.load('exps_data/exp3_bdqn_returns_1.h5')/10
-    data3 = dd.io.load('exps_data/exp3_bdqn_returns_3.h5')/10
+    data0 = dd.io.load('exps_data/exp3_bdqn_returns_0.h5')
+    data1 = dd.io.load('exps_data/exp3_bdqn_returns_2.h5')
+    data2 = dd.io.load('exps_data/exp3_bdqn_returns_1.h5')
+    data3 = dd.io.load('exps_data/exp3_bdqn_returns_3.h5')
 
     types = ["Sparse rewards and Same absorbing set (BDQN)",
               "Dense rewards and Same absorbing set (BDQN)",
@@ -289,8 +356,8 @@ def full_dense_bdqn():
     data = pd.melt(data, "Domain", var_name="Tasks", value_name="Average Returns")
 
     fig, ax = plt.subplots()
-    ax = sns.boxplot(x="Tasks", y="Average Returns", hue="Domain", data=data, linewidth=3, showfliers = False, medianprops=dict(color="red", linewidth=3))
-    ax.set_ylim(-0.1, 0.2)  # <-- Set the y-axis limits here, on the axes object
+    ax = sns.boxplot(x="Tasks", y="Average Returns", hue="Domain", data=data, linewidth=3, showfliers = False)
+    ax.set_ylim(-0.5, 2) # <-- Set the y-axis limits here, on the axes object
     fig.savefig("plots/full_dense_bdqn.pdf", bbox_inches='tight')
 
 #####################################################################################
@@ -563,6 +630,7 @@ def plot_bdqn_EQ_vs_bdqn_Q_bar():
 
 #####################################################################################
 
+                                                                                                          
 
 def baseline():
     """
@@ -605,4 +673,7 @@ baseline()
 plot_bdqn_EQ_vs_epsilon_bar_EQ()
 plot_bdqn_EQ_vs_epsilon_Q_bar()
 plot_bdqn_EQ_vs_bdqn_Q_bar()
+plot4()
 plot4_bdqn()
+full_dense_bdqn()
+plot4_filtered()
