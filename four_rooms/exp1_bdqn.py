@@ -33,13 +33,13 @@ mask_prob = 0.8     # Per-transaction masking: each transition included in ~80% 
 alpha_q = 1         # Learning rate for Q-learning
 alpha_eq = 1        # Learning rate for goal-oriented Q-learning
 init_q_range = 0.2  # Random Q-value initialization range [-init_q_range, init_q_range]
-warmup_steps = 30000  # Warmup phase for better per-transaction diversity (matching exp3_bdqn)
+warmup_steps = 5000  # Warmup phase for better per-transaction diversity (matching exp3_bdqn)
 
 # Policy agreement stopping condition
-policy_agreement_threshold = 0.95  # 95% of states must have policy agreement (matching exp3_bdqn)
+policy_agreement_threshold = 0.95  # 95% of states must have policy agreement
 
 # POLICY-ONLY Convergence Parameters (ignores value differences, focuses on behavior)
-optimality_threshold = 0.3      # 30% of states must match optimal policy (matching exp3_bdqn)
+optimality_threshold = 0.30      # 30% of states must match optimal policy
 
 idxs = np.arange(len(Tasks))
 for i in range(num_runs):

@@ -477,9 +477,9 @@ def hyper_plot_general(param_values, param_name, file_suffix, plot_filename):
     y = np.arange(0, num_tasks)
     x = np.array(param_values)
 
-    fig = plt.figure(figsize=(22, 8))
-    ax1 = fig.add_subplot(121, projection='3d')
-    ax2 = fig.add_subplot(122, projection='3d')
+    fig = plt.figure(figsize=(12, 16))
+    ax1 = fig.add_subplot(211, projection='3d')
+    ax2 = fig.add_subplot(212, projection='3d')
     # Make bar thickness proportional to number of tasks
     # Bars are thin along the epsilon axis (dx), wide along number of tasks axis (dy)
     dx = (x[1] - x[0]) * 0.2 if len(x) > 1 else 0.2  # thin along param axis
@@ -669,11 +669,77 @@ def baseline():
 
 
 
-baseline()
-plot_bdqn_EQ_vs_epsilon_bar_EQ()
-plot_bdqn_EQ_vs_epsilon_Q_bar()
-plot_bdqn_EQ_vs_bdqn_Q_bar()
-plot4()
-plot4_bdqn()
-full_dense_bdqn()
-plot4_filtered()
+# baseline()
+# plot_bdqn_EQ_vs_epsilon_bar_EQ()
+# plot_bdqn_EQ_vs_epsilon_Q_bar()
+# plot_bdqn_EQ_vs_bdqn_Q_bar()
+# plot4()
+# plot4_bdqn()
+# full_dense_bdqn()
+# plot4_bdqn()
+# plot4_filtered()
+
+# hyper_plot_epsilon()
+
+def compare_plot4_bdqn_vs_filtered():
+    """
+    Plot BDQN convergence (plot4_bdqn) and baseline convergence (plot4_filtered) side by side for easy comparison.
+    """
+    # --- Baseline (filtered) ---
+    tasks = [r'${M_{\emptyset}}$', r'${M_{\mathcal{U}}}$', r'${M_{T}}\wedge{M_{L}}$', r'${M_{T}}\wedge\neg{M_{L}}$', r'${M_{L}}\wedge\neg{M_{T}}$', r'${M_{T}}\bar{\vee}{M_{L}}$', r'${M_{T}}$', r'$\neg {M_{T}}$', r'${M_{L}}$', r'$\neg {M_{L}}$', r'${M_{T}}\vee{M_{L}}$', r'${M_{T}}\vee\neg{M_{L}}$',
+              r'${M_{L}}\vee\neg{M_{T}}$', r'${M_{T}}\bar{\wedge}{M_{L}}$', r'$\neg({M_{T}} \veebar {M_{L}})$', r'${M_{T}} \veebar {M_{L}}$']
+    exclude_indices = {3, 4, 5, 7, 9, 14, 15}
+    filtered_tasks = [task for i, task in enumerate(tasks) if i not in exclude_indices]
+    n = 2
+    # Load baseline data
+    data0 = dd.io.load('exps_data/exp3_returns_0.h5')
+    data1 = dd.io.load('exps_data/exp3_returns_2.h5')
+    data2 = dd.io.load('exps_data/exp3_returns_1.h5')
+    data3 = dd.io.load('exps_data/exp3_returns_3.h5')
+    types = ["Sparse rewards and Same absorbing set", "Dense rewards and Same absorbing set", "Sparse rewards and Different absorbing set", "Dense rewards and Different absorbing set"]
+    filtered_data_rows = []
+    for data_array, type_name in zip([data0, data1, data2, data3], types):
+        for i in range(len(data_array)):
+            row = []
+            for t in range(n, 16):
+                if t not in exclude_indices:
+                    row.append(data_array[i, t])
+            row.append(type_name)
+            filtered_data_rows.append(row)
+    baseline_df = pd.DataFrame(filtered_data_rows, columns=filtered_tasks[n:]+["Domain"])
+    baseline_df = pd.melt(baseline_df, "Domain", var_name="Tasks", value_name="Average Returns")
+    # --- BDQN ---
+    data0_bdqn = dd.io.load('exps_data/exp3_bdqn_returns_0.h5')
+    data1_bdqn = dd.io.load('exps_data/exp3_bdqn_returns_2.h5')
+    data2_bdqn = dd.io.load('exps_data/exp3_bdqn_returns_1.h5')
+    data3_bdqn = dd.io.load('exps_data/exp3_bdqn_returns_3.h5')
+    types_bdqn = ["Sparse rewards and Same absorbing set (BDQN)", "Dense rewards and Same absorbing set (BDQN)", "Sparse rewards and Different absorbing set (BDQN)", "Dense rewards and Different absorbing set (BDQN)"]
+    filtered_data_rows_bdqn = []
+    for data_array, type_name in zip([data0_bdqn, data1_bdqn, data2_bdqn, data3_bdqn], types_bdqn):
+        for i in range(len(data_array)):
+            row = []
+            for t in range(n, 16):
+                if t not in exclude_indices:
+                    row.append(data_array[i, t])
+            row.append(type_name)
+            filtered_data_rows_bdqn.append(row)
+    bdqn_df = pd.DataFrame(filtered_data_rows_bdqn, columns=filtered_tasks[n:]+["Domain"])
+    bdqn_df = pd.melt(bdqn_df, "Domain", var_name="Tasks", value_name="Average Returns")
+    # --- Plot side by side ---
+    rc_ = {'figure.figsize':(25,16),'axes.labelsize': 30, 'font.size': 30, 'legend.fontsize': 20, 'axes.titlesize': 30}
+    sns.set(rc=rc_, style="darkgrid",font_scale = 1.8)
+    rc('text', usetex=False)
+    fig, axes = plt.subplots(2, 1, sharex=True)
+    # Baseline
+    sns.boxplot(x="Tasks", y="Average Returns", hue="Domain", data=baseline_df, linewidth=3, showfliers=False, ax=axes[0])
+    axes[0].set_ylim(-0.5, 2)
+    axes[0].set_title("Baseline Convergence")
+    # BDQN
+    sns.boxplot(x="Tasks", y="Average Returns", hue="Domain", data=bdqn_df, linewidth=3, showfliers=False, ax=axes[1])
+    axes[1].set_ylim(-0.5, 2)
+    axes[1].set_title("BDQN Convergence")
+    plt.tight_layout()
+    fig.savefig("plots/compare_bdqn_vs_baseline_filtered.pdf", bbox_inches='tight')
+    plt.show()
+
+compare_plot4_bdqn_vs_filtered()

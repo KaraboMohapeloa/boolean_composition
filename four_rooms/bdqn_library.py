@@ -933,8 +933,8 @@ def Bootstrapped_Q_learning(env, Q_optimal=None, gamma=1, alpha=0.1,
     # Stopping condition: ensemble policy agreement + optimality check (POLICY-ONLY VERSION)
     def check_policy_agreement(episode_num):
         # Check convergence using your specific criteria (POLICY-FOCUSED):
-        # 1. Ensemble agrees on POLICIES for 95% of states (ignore value differences)
-        # 2. 50% of states derive the optimal policy
+        # 1. Ensemble agrees on POLICIES for policy_agreement_threshold% of states (ignore value differences)
+        # 2. optimality_threshold% of states derive the optimal policy
         agreed = check_ensemble_policy_consensus_with_optimality(Q_list, Q_optimal=Q_optimal,
                                                                policy_agreement_threshold=policy_agreement_threshold,
                                                                policy_optimality_threshold=optimality_threshold)
@@ -1009,8 +1009,8 @@ def Bootstrapped_Q_learning(env, Q_optimal=None, gamma=1, alpha=0.1,
                     
                     # Show your NEW policy-focused convergence criteria
                     print(f"✓ POLICY-ONLY CONVERGENCE:")
-                    print(f"  Policy consensus (need >=95%): {ensemble_policy_agrees * 100:.1f}%")
-                    print(f"  Policy optimality (need >=50%): {policy_optimal * 100:.1f}%")
+                    print(f"  Policy consensus (need >={policy_agreement_threshold*100:.0f}%): {ensemble_policy_agrees * 100:.1f}%")
+                    print(f"  Policy optimality (need >={optimality_threshold*100:.0f}%): {policy_optimal * 100:.1f}%")
                     print(f"  [Note: Ignoring value differences - focusing on behavior only]")
                     
                     # Detailed state-by-state optimality analysis
@@ -1314,8 +1314,8 @@ def Bootstrapped_Goal_Oriented_Q_learning(env, T_states=None, Q_optimal=None,
                     
                     # Show your NEW policy-focused convergence criteria
                     print(f"✓ EVF POLICY-ONLY CONVERGENCE:")
-                    print(f"  EVF policy consensus (need >=95%): {ensemble_policy_agrees * 100:.1f}%")
-                    print(f"  EVF policy optimality (need >=50%): {policy_optimal * 100:.1f}%")
+                    print(f"  EVF policy consensus (need >={policy_agreement_threshold*100:.0f}%): {ensemble_policy_agrees * 100:.1f}%")
+                    print(f"  EVF policy optimality (need >={optimality_threshold*100:.0f}%): {policy_optimal * 100:.1f}%")
                     print(f"  [Note: Ignoring EVF value differences - focusing on GPI behavior only]")
                     
                     # Detailed state-by-state EVF optimality analysis

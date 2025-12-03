@@ -18,7 +18,12 @@ def analyze_sample_efficiency():
     to reach threshold performance between vanilla and bootstrapped DQN
     """
     if not os.path.exists('exps_data/vanilla/prime_experiment_stats.h5'):
-        print("No data to analyze yet. Run the experiment first.")
+        print("Vanilla DQN data not found. Run prime_experiment.py or the vanilla portion first.")
+        return
+    
+    if not os.path.exists('exps_data/bootstrapped/prime_experiment_stats.h5'):
+        print("Bootstrapped DQN data not found. Run prime_experiment_bootstrapped_only.py first.")
+        print("Note: The bootstrapped experiment must complete successfully for stats to be saved.")
         return
     
     print("\n" + "="*70)
@@ -296,7 +301,12 @@ def plot_learning_curves():
     Plot learning curves comparing vanilla DQN vs Bootstrapped DQN
     """
     if not os.path.exists('exps_data/vanilla/prime_experiment_stats.h5'):
-        print("No data to plot yet. Run the experiment first.")
+        print("Vanilla DQN data not found. Run prime_experiment.py or the vanilla portion first.")
+        return
+    
+    if not os.path.exists('exps_data/bootstrapped/prime_experiment_stats.h5'):
+        print("Bootstrapped DQN data not found. Run prime_experiment_bootstrapped_only.py first.")
+        print("Note: The bootstrapped experiment must complete successfully for stats to be saved.")
         return
     
     try:
@@ -420,7 +430,7 @@ def plot2():
         # plt.show()
         fig.savefig("plots/returns_{0}.pdf".format(tasks[task]), bbox_inches='tight')
 
-analyze_sample_efficiency()
-plot_learning_curves()
+# analyze_sample_efficiency()
+# plot_learning_curves()
 plot1()
 plot2()

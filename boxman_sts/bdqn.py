@@ -168,7 +168,9 @@ class BootstrappedReplayBuffer(object):
                     reward = self.N
                 
                 obses_goal_t.append(np.concatenate((obs_t, goal), axis=2))
-                actions.append(np.array(action.cpu(), copy=False))
+                # Convert action tensor to numpy and flatten to scalar for batching
+                action_np = action.cpu().numpy() if hasattr(action, 'cpu') else np.array(action)
+                actions.append(action_np.item() if action_np.size == 1 else action_np.flatten()[0])
                 rewards.append(reward)
                 obses_goal_tp1.append(np.concatenate((obs_tp1, goal), axis=2))
                 dones.append(done)
@@ -314,7 +316,6 @@ class BootstrappedAgent(object):
                  gamma=0.99,
                  n_heads=10,
                  mask_prob=0.8,
-                 init_q_range=0.2,
                  print_freq=10,
                  exploration_strategy='thompson',
                  path=None):
@@ -344,7 +345,6 @@ class BootstrappedAgent(object):
         self.path = path
         self.n_heads = n_heads
         self.mask_prob = mask_prob
-        self.init_q_range = init_q_range
         self.exploration_strategy = exploration_strategy
         self.training_stats = {"R": [], "T": 0}
 
@@ -356,10 +356,6 @@ class BootstrappedAgent(object):
         if use_cuda:
             self.q_func.cuda()
             self.target_q_func.cuda()
-
-        # Initialize Q-values with small positive random values
-        if init_q_range > 0:
-            self._initialize_q_values()
 
         # Separate optimizers for each head (or single optimizer for all)
         self.optimizer = optim.Adam(self.q_func.parameters(), lr=learning_rate)
@@ -375,16 +371,12 @@ class BootstrappedAgent(object):
         self.steps = 0
         self.update_counts = [0] * n_heads  # Track updates per head
 
-    def _initialize_q_values(self):
-        """Initialize Q-values with small positive random values (optimistic initialization)."""
-        with torch.no_grad():
-            for head in self.q_func.heads:
-                # Initialize final layer with small positive values
-                if isinstance(head, nn.Sequential):
-                    final_layer = head[-1]
-                    if isinstance(final_layer, nn.Linear):
-                        final_layer.weight.data.uniform_(0, self.init_q_range)
-                        final_layer.bias.data.uniform_(0, self.init_q_range)
+    def set_intermediate_save_callback(self, callback):
+        """
+        Register a callback to be called every time an intermediate save occurs.
+        The callback will be called as: callback(self.training_stats)
+        """
+        self._intermediate_save_callback = callback
 
     def select_action_thompson(self, obs):
         """
@@ -556,12 +548,22 @@ class BootstrappedAgent(object):
             if t < self.warmup_steps:
                 warmup_buffer.append((obs, action, reward, new_obs, done))
 
+            # --- Prevent getting stuck in one episode forever ---
+            max_episode_steps = 20000  # or another reasonable value
+            if 'episode_step' not in locals():
+                episode_step = 0
+            episode_step += 1
+            if episode_step >= max_episode_steps:
+                done = True
+                print(f"[WARNING] Forcing episode end at {max_episode_steps} steps to prevent infinite episode.")
+
             if done:
                 obs = self.env.reset()
                 self.training_stats["R"].append(0)
+                episode_step = 0
 
-            # Training updates (after warmup)
-            if t >= self.warmup_steps and t % self.train_freq == 0:
+            # Training updates (after warmup AND after learning_starts)
+            if t >= self.warmup_steps and t >= self.learning_starts and t % self.train_freq == 0:
                 # Train each head with per-step masking
                 for head_idx in range(self.n_heads):
                     batch = self.replay_buffer.sample_bootstrapped(self.batch_size, head_idx)
@@ -573,10 +575,22 @@ class BootstrappedAgent(object):
             if t > self.warmup_steps and t % self.target_update_freq == 0:
                 self.target_q_func.load_state_dict(self.q_func.state_dict())
                 if self.path:
-                    torch.save(self.q_func.state_dict(), self.path + 'model_bdqn.pth')
-                    dd.io.save(self.path + 'bdqn_training_stats.h5', self.training_stats)
-                    print(f"\nModel and stats saved (step {t})")
-                    print(f"Head update counts: {self.update_counts}")
+                    try:
+                        self.training_stats["T"] = t
+                        torch.save(self.q_func.state_dict(), self.path + 'model_bdqn.pth')
+                        dd.io.save(self.path + 'bdqn_training_stats.h5', self.training_stats)
+                        print(f"\nModel and stats saved (step {t})")
+                        print(f"  Model: {self.path}model_bdqn.pth")
+                        print(f"  Stats: {self.path}bdqn_training_stats.h5")
+                        print(f"  Episodes: {len(self.training_stats['R'])}")
+                        print(f"Head update counts: {self.update_counts}")
+                        # Call the callback if set
+                        if hasattr(self, '_intermediate_save_callback') and self._intermediate_save_callback:
+                            self._intermediate_save_callback(self.training_stats)
+                    except Exception as e:
+                        print(f"\nWARNING: Failed to save at step {t}: {e}")
+                        import traceback
+                        traceback.print_exc()
 
             self.steps += 1
 
@@ -587,7 +601,8 @@ class BootstrappedAgent(object):
             else:
                 mean_100ep_reward = 0
             num_episodes = len(self.training_stats["R"])
-            
+
+            # Print average reward for last 100 episodes every print_freq episodes
             if done and self.print_freq is not None and num_episodes % self.print_freq == 0:
                 print("--------------------------------------------------------")
                 print(f"steps: {t}")
@@ -598,11 +613,32 @@ class BootstrappedAgent(object):
                 print(f"head updates: {self.update_counts}")
                 print("--------------------------------------------------------")
 
-        # Final save
+            # Always print average reward for last 100 episodes every 100 episodes
+            if done and num_episodes % 100 == 0:
+                print(f"[INFO] Average reward (last 100 episodes): {mean_100ep_reward}")
+
+            # Print average reward for last 1000 steps every 1000 steps
+            if t > 0 and t % 1000 == 0:
+                # Find which episodes cover the last 1000 steps
+                steps_per_episode = self.training_stats["T"] / max(1, len(self.training_stats["R"]))
+                episodes_approx = int(1000 / steps_per_episode) if steps_per_episode > 0 else 1
+                rewards_window_1000 = self.training_stats["R"][-episodes_approx:]
+                mean_1000steps_reward = round(np.mean(rewards_window_1000), 2) if rewards_window_1000 else 0
+                print(f"[INFO] Average reward (last ~1000 steps): {mean_1000steps_reward}")
+
+        # Final save (use max_timesteps or self.steps, whichever is accurate)
         self.training_stats["T"] = self.steps
         if self.path:
             torch.save(self.q_func.state_dict(), self.path + 'model_bdqn_final.pth')
             dd.io.save(self.path + 'bdqn_training_stats_final.h5', self.training_stats)
+            print(f"\n{'='*70}")
+            print(f"TRAINING COMPLETE")
+            print(f"{'='*70}")
+            print(f"Total timesteps: {self.steps:,}")
+            print(f"Total episodes: {len(self.training_stats['R'])}")
+            print(f"Final model saved: {self.path}model_bdqn_final.pth")
+            print(f"Final stats saved: {self.path}bdqn_training_stats_final.h5")
+            print(f"{'='*70}\n")
 
     def _bootstrap_from_warmup(self, warmup_buffer):
         """
@@ -634,7 +670,7 @@ class BootstrappedAgent(object):
                         
                         batch = (
                             np.array([obs_goal]),
-                            np.array([action.cpu().numpy()]),
+                            action.cpu().numpy(),  # Already has shape (1, 1), don't wrap again
                             np.array([goal_reward]),
                             np.array([new_obs_goal]),
                             np.array([done])
@@ -660,7 +696,8 @@ class BootstrappedAgent(object):
         obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = batch
         
         obs_batch = Variable(torch.from_numpy(obs_batch).type(FloatTensor))
-        act_batch = Variable(torch.from_numpy(act_batch).type(LongTensor))
+        # Reshape actions to (batch_size, 1) for gather operation
+        act_batch = Variable(torch.from_numpy(act_batch).type(LongTensor)).unsqueeze(1)
         rew_batch = Variable(torch.from_numpy(rew_batch).type(FloatTensor))
         next_obs_batch = Variable(torch.from_numpy(next_obs_batch).type(FloatTensor))
         not_done_mask = Variable(torch.from_numpy(1 - done_mask)).type(FloatTensor)
@@ -670,7 +707,7 @@ class BootstrappedAgent(object):
             rew_batch = rew_batch.cuda()
 
         # Current Q-values from this head
-        current_q_values = self.q_func(obs_batch, head_idx=head_idx).gather(1, act_batch.squeeze(2)).squeeze()
+        current_q_values = self.q_func(obs_batch, head_idx=head_idx).gather(1, act_batch).squeeze(1)
         
         # Target Q-values from this head's target network
         with torch.no_grad():
